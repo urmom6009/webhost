@@ -1,0 +1,52 @@
+name: API Discovery
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+  schedule:
+      - cron: '34 4 * * 2'
+  
+  workflow_dispatch: 
+
+permissions:
+  contents: write
+  pull-requests: write    
+
+
+jobs:
+
+  Trigger_APIsec_scan:
+    permissions:
+      security-events: write
+      actions: read
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Run APIsec scan and enforce thresholds (Docker)
+        id: scan
+        uses: apisec-inc/apisec-run-scan-and-gate@latest
+        env:
+          APISEC_TOKEN: ${{ secrets.APISEC_TOKEN }}
+          APISEC_HOST: https://api.apisecapps.com
+          APISEC_APP_ID: ${{ vars.APISEC_APP_ID }}
+          APISEC_INSTANCE_ID: ${{ vars.APISEC_INSTANCE_ID }}
+          APISEC_AUTH_ID: ${{ vars.APISEC_AUTH_ID }}
+          APISEC_MAX_CRITICAL: "0"
+          APISEC_MAX_HIGH: "5"
+          APISEC_MAIL_REPORT: "true"
+        
+        run: 
+          docker run -rm \
+            -e APISEC_TOKEN \
+            -e APISEC_HOST \
+            -e APISEC_APP_ID \
+            -e APISEC_INSTANCE_ID \
+            -e APISEC_AUTH_ID \
+            -e APISEC_MAX_CRITICAL \
+            -e APISEC_MAX_HIGH 
