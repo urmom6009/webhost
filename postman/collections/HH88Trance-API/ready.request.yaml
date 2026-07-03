@@ -1,0 +1,27 @@
+$kind: http-request
+name: Readiness Check
+method: GET
+url: '{{baseUrl}}/ready'
+order: 3000
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test("Status is 200", () => {
+          pm.response.to.have.status(200);
+        });
+
+        pm.test("Response is JSON", () => {
+          pm.response.to.be.json;
+        });
+
+        pm.test("Body has status: ready", () => {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("status");
+          pm.expect(json.status).to.eql("ready");
+        });
+
+        pm.test("Response time is under 2000ms", () => {
+          pm.expect(pm.response.responseTime).to.be.below(2000);
+        });

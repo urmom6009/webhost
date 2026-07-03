@@ -1,0 +1,29 @@
+$kind: http-request
+name: Get Version
+method: GET
+url: '{{baseUrl}}/version'
+order: 2000
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test("Status is 200", () => {
+          pm.response.to.have.status(200);
+        });
+
+        pm.test("Response is JSON", () => {
+          pm.response.to.be.json;
+        });
+
+        pm.test("Body has a version string", () => {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("version");
+          pm.expect(json.version).to.be.a("string").and.not.empty;
+        });
+
+        // Save version for use in later requests or monitors
+        const json = pm.response.json();
+        if (json && json.version) {
+          pm.environment.set("appVersion", json.version);
+        }

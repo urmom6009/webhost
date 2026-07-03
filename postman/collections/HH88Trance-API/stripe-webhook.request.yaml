@@ -1,0 +1,45 @@
+$kind: http-request
+name: Stripe Webhook
+method: POST
+url: '{{baseUrl}}/stripe/webhook'
+order: 4000
+headers:
+  - key: stripe-signature
+    value: '{{stripeSignature}}'
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {"type": "checkout.session.completed", "data": {"object": {}}}
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        // Stripe rejects requests with a missing or invalid signature
+        pm.test("Status is 400 (invalid signature) or 200 (valid)", () => {
+          pm.expect(pm.response.code).to.be.oneOf([200, 400]);
+        });
+
+        pm.test("Response is JSON", () => {
+          pm.response.to.be.json;
+        });
+
+        // When signature is missing/invalid, expect a detail error message
+        if (pm.response.code === 400) {
+          pm.test("Error response has detail field", () => {
+            const json = pm.response.json();
+            pm.expect(json).to.have.property("detail");
+            pm.expect(json.detail).to.be.a("string").and.not.empty;
+          });
+        }
+
+        // When valid, expect received: true
+        if (pm.response.code === 200) {
+          pm.test("Successful response has received: true", () => {
+            const json = pm.response.json();
+            pm.expect(json).to.have.property("received");
+            pm.expect(json.received).to.be.true;
+          });
+        }

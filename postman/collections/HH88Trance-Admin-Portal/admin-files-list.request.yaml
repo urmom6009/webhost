@@ -1,0 +1,6 @@
+$kind: http-request
+name: List Server Files
+method: GET
+url: '{{baseUrl}}/admin/files'
+description: Returns the HTML page listing files in the download storage directory
+order: 7000

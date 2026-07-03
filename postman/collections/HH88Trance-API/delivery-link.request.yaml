@@ -1,0 +1,5 @@
+$kind: http-request
+name: Redeem Delivery Link
+method: GET
+url: '{{baseUrl}}/dl/{{deliveryToken}}'
+order: 6000

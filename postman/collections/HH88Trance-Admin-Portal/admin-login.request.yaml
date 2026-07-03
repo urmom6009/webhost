@@ -1,0 +1,11 @@
+$kind: http-request
+name: Admin Login
+method: POST
+url: '{{baseUrl}}/admin/login'
+description: Authenticates with the admin portal token and sets a session cookie
+order: 2000
+body:
+  type: urlencoded
+  content:
+    - key: token
+      value: '{{adminPortalToken}}'
