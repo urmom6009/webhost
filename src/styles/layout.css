@@ -1,0 +1,184 @@
+.space-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(115deg, transparent 0 42%, rgba(184, 190, 196, 0.08) 42.2% 42.7%, transparent 43% 100%),
+    repeating-linear-gradient(0deg, rgba(184, 190, 196, 0.025) 0 1px, transparent 1px 10px);
+  opacity: 0.34;
+  mix-blend-mode: screen;
+}
+
+.space-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 52%, transparent 0 18rem, rgba(0, 0, 0, 0.78) 44rem);
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(4, 4, 5, 0.96);
+  border-bottom: 1px solid rgba(184, 190, 196, 0.18);
+  backdrop-filter: blur(16px);
+}
+
+.money-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  flex-direction: column;
+  gap: 0.2rem;
+  height: 86px;
+  overflow: hidden;
+  border: 0;
+  cursor: pointer;
+  background:
+    linear-gradient(90deg, rgba(157, 16, 28, 0.3), transparent 34%, transparent 66%, rgba(157, 16, 28, 0.2)),
+    linear-gradient(180deg, rgba(184, 190, 196, 0.1), transparent 48%, rgba(0, 0, 0, 0.56)),
+    #090a0b;
+}
+
+.money-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-block: 1px solid rgba(184, 190, 196, 0.18);
+  background:
+    linear-gradient(90deg, transparent 0 12%, rgba(184, 190, 196, 0.16) 12% 12.2%, transparent 12.2% 87.8%, rgba(184, 190, 196, 0.16) 87.8% 88%, transparent 88%),
+    repeating-linear-gradient(90deg, rgba(184, 190, 196, 0.07) 0 1px, transparent 1px 72px);
+}
+
+.brand-mark {
+  position: relative;
+  z-index: 1;
+  font-family: "Oswald", Impact, sans-serif;
+  font-size: clamp(2.35rem, 5.8vw, 4.25rem);
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #f0eee8;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 #000, 0 0 16px rgba(157, 16, 28, 0.42);
+}
+
+.brand-kicker {
+  position: relative;
+  z-index: 1;
+  color: #aeb4ba;
+  font-size: clamp(0.62rem, 1.5vw, 0.78rem);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.main-nav {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(0.4rem, 1.6vw, 1.5rem);
+  min-height: 64px;
+  padding: 0.75rem 1.25rem 0.65rem;
+  overflow-x: auto;
+  scrollbar-color: rgba(255, 255, 255, 0.42) transparent;
+}
+
+.nav-group {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.nav-children {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 0;
+  padding: 0.45rem;
+  border: 1px solid rgba(184, 190, 196, 0.18);
+  background: rgba(7, 8, 9, 0.98);
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+  transform: translateX(-0.45rem);
+  transition: max-width 180ms ease, opacity 160ms ease, transform 160ms ease;
+}
+
+.nav-group:hover .nav-children,
+.nav-group:focus-within .nav-children,
+.nav-group.section-open .nav-children {
+  max-width: 26rem;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.nav-group-line {
+  width: 22px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--red-hot), rgba(184, 190, 196, 0.35));
+}
+
+.nav-link {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 0.85rem;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  color: #c5c9cc;
+  font-weight: 800;
+  font-size: clamp(0.76rem, 1.15vw, 0.92rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nav-link.nested {
+  min-height: 34px;
+  padding-inline: 0.72rem;
+  border-color: rgba(184, 190, 196, 0.12);
+  color: #aeb4ba;
+  font-size: 0.72rem;
+}
+
+.nav-link.active,
+.nav-link:hover {
+  border-color: rgba(184, 190, 196, 0.28);
+  background: rgba(184, 190, 196, 0.075);
+}
+
+.accent-red.active,
+.accent-red:hover {
+  color: var(--red-hot);
+}
+
+.accent-steel.active,
+.accent-steel:hover {
+  color: var(--steel);
+}
+
+.accent-amber.active,
+.accent-amber:hover {
+  color: var(--amber);
+}
+
+.accent-cyan.active,
+.accent-cyan:hover {
+  color: var(--cyan);
+}
+
+.accent-white.active,
+.accent-white:hover {
+  color: var(--white);
+}
+
+.page-shell {
+  width: min(100% - 3rem, 1160px);
+  margin: 0 auto;
+}

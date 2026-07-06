@@ -28,4 +28,17 @@ describe("App routing and interactions", () => {
     render(<App />);
     expect(screen.getByRole("dialog", { name: /18\+ entry required/i })).toBeInTheDocument();
   });
+
+  it("renders the admin portal and edits a local video draft", () => {
+    window.history.pushState({}, "", "/admin");
+    render(<App />);
+
+    expect(screen.getByRole("heading", { name: /content control/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^videos$/i }));
+    fireEvent.click(screen.getAllByRole("button", { name: /add file/i })[0]);
+
+    expect(screen.getByDisplayValue("New Custom File")).toBeInTheDocument();
+    fireEvent.change(screen.getAllByLabelText("Title")[0], { target: { value: "Updated Custom File" } });
+    expect(screen.getByDisplayValue("Updated Custom File")).toBeInTheDocument();
+  });
 });

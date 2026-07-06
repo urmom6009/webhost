@@ -1,0 +1,23 @@
+name: HH88Trance
+values:
+  - key: baseUrl
+    value: 'http://localhost:8000'
+    enabled: true
+  - key: stripeSignature
+    value: ''
+    enabled: true
+    type: secret
+  - key: telegramWebhookSecret
+    value: ''
+    enabled: true
+    type: secret
+  - key: deliveryToken
+    value: ''
+    enabled: true
+  - key: adminPortalToken
+    value: ''
+    enabled: true
+    type: secret
+  - key: productId
+    value: ''
+    enabled: true

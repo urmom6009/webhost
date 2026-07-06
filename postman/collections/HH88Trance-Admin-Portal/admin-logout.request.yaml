@@ -1,0 +1,6 @@
+$kind: http-request
+name: Admin Logout
+method: POST
+url: '{{baseUrl}}/admin/logout'
+description: Clears the admin session cookie and redirects to login
+order: 3000

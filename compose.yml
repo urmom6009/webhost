@@ -1,0 +1,71 @@
+services:
+  app:
+    build:
+      context: /srv/code/storefront
+      dockerfile: /srv/stacks/40-apps/storefront/Dockerfile
+    container_name: storefront-app
+    env_file: 
+      - /srv/code/storefront/.env
+    volumes:
+      - /mnt/storefront-media/products:/srv/storefront-media/products:rw
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - proxy
+      - storefront-back
+    restart: unless-stopped
+    expose:
+      - "8000"
+
+  db:
+    image: postgres:16
+    container_name: storefront-db
+    env_file:
+      - /srv/code/storefront/.env
+    environment:
+      POSTGRES_USER: storefront
+      POSTGRES_DB: storefront
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U storefront -d storefront"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - storefront_pgdata:/var/lib/postgresql/data
+    networks:
+      - storefront-back
+    restart: unless-stopped
+
+  downloads:
+    image: nginx:1.27-alpine
+    container_name: storefront-dls
+    command: >
+      sh -c "addgroup -g 1005 storefront-media 2>/dev/null || true
+      && sed -i 's/^user  nginx;/user nginx storefront-media;/' /etc/nginx/nginx.conf
+      && nginx -g 'daemon off;'"
+    volumes:
+      - /srv/code/storefront/deploy/nginx.downloads.conf:/etc/nginx/conf.d/default.conf:ro
+      - /mnt/storefront-media/products:/srv/storefront-media/products:ro
+    networks:
+      - proxy
+      - storefront-back
+    depends_on:
+      - app
+    restart: unless-stopped
+    expose:
+      - "8080"
+
+networks:
+  proxy:
+    name: proxy
+    external: true
+
+  storefront-back:
+    internal: true
+    name: storefront-back
+
+volumes:
+  storefront_pgdata:
+    name: storefront_storefront_pgdata
+    external: true

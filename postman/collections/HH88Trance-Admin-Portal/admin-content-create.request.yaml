@@ -1,0 +1,45 @@
+$kind: http-request
+name: Create Product
+method: POST
+url: '{{baseUrl}}/admin/content'
+description: 'Creates a new product. Accepts title, slug, price, currency, description, preview_caption, active flag, optional storage_key/display_name/content_type for a pre-existing local file, and an optional file upload.'
+order: 5000
+body:
+  type: formdata
+  content:
+    - key: title
+      type: text
+      value: 'My Product'
+    - key: slug
+      type: text
+      value: ''
+      description: 'Leave blank to auto-generate from title. Letters, numbers, dashes, underscores only.'
+    - key: price
+      type: text
+      value: '15.00'
+    - key: currency
+      type: text
+      value: 'usd'
+    - key: description
+      type: text
+      value: ''
+    - key: preview_caption
+      type: text
+      value: ''
+      description: 'Optional caption shown in the Telegram catalog preview.'
+    - key: active
+      type: text
+      value: 'on'
+      description: 'Send "on" to publish immediately, or leave blank to save as inactive.'
+    - key: storage_key
+      type: text
+      value: ''
+      description: 'Optional. Path to a pre-existing local file, e.g. my-product/file.zip'
+    - key: display_name
+      type: text
+      value: ''
+      description: 'Optional. Download filename shown to the buyer.'
+    - key: content_type
+      type: text
+      value: ''
+      description: 'Optional. MIME type, e.g. video/mp4 or application/zip'

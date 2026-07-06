@@ -1,6 +1,6 @@
 # HH88TRANCE
 
-Vercel-ready static React site for the HH88TRANCE adult audio/video brand.
+Vercel-ready React site plus the Telegram storefront backend for the HH88TRANCE adult audio/video brand.
 
 The first implementation follows the provided PDF references from `/Users/colinvargas/Downloads/HH88Trance-Web` for page structure, dark starfield styling, neon navigation, card density, and adult-brand tone. Public copy is intentionally sanitized for Vercel hosting risk.
 
@@ -12,6 +12,8 @@ The first implementation follows the provided PDF references from `/Users/colinv
 - Vitest and Testing Library
 - ESLint
 - Vercel static hosting with SPA rewrites
+- FastAPI Telegram/Stripe storefront backend under `backend/`
+- Pytest and Alembic for backend validation and migrations
 
 ## Commands
 
@@ -21,13 +23,21 @@ The first implementation follows the provided PDF references from `/Users/colinv
 - `npm run lint` runs ESLint.
 - `npm run build` type-checks and builds the production bundle.
 - `npm run preview` serves the production build locally.
+- `python -m venv .venv && .venv/bin/python -m pip install -r requirements.txt` creates a local backend test environment.
+- `.venv/bin/python -m pytest` runs the Telegram storefront backend tests.
+- `.venv/bin/alembic upgrade head` runs backend migrations using `backend/alembic`.
 
 ## Project Structure
 
-- `src/App.tsx` contains the route shell, shared components, and page views.
-- `src/content.ts` contains navigation, video cards, findom plans, contact links, and accordion copy.
-- `src/styles.css` contains the full visual system and responsive layout.
-- `tests/` contains route/content model tests and key interaction coverage.
+- `src/app/` contains client-side route selection and app host detection.
+- `src/layout/` contains the shared site shell, header, footer, and age gate.
+- `src/pages/` contains public route views.
+- `src/content/` contains editable navigation, catalog, link, about, and findom data.
+- `src/features/admin/` contains the local static-content admin editor.
+- `src/styles/` contains grouped CSS for base, layout, pages, admin, and responsive rules.
+- `tests/` contains route/content model tests and key frontend interaction coverage.
+- `backend/app/` contains the FastAPI, Telegram bot, Stripe webhook, admin portal, and backend tests copied from `/srv/code/storefront`.
+- `backend/alembic/`, `backend/deploy/`, and `backend/scripts/` contain migrations and deployment helpers for the storefront service.
 - `assets/README.md` documents where production logo, banner, background, and thumbnail assets should be placed when available.
 - `docs/hosting-note.md` documents Vercel policy considerations and intentional deviations from the PDF references.
 
@@ -43,6 +53,8 @@ The first implementation follows the provided PDF references from `/Users/colinv
 - `/about`
 - `/contact`
 - `/privacy`
+- `admin.hh88trance.com` renders the private admin portal for static content editing
+- `/admin` renders the same portal only during local development and test runs
 
 The site uses client-side routing with `vercel.json` rewrites so deep links load through `index.html`.
 
@@ -50,7 +62,7 @@ The site uses client-side routing with `vercel.json` rewrites so deep links load
 
 The source PDFs include explicit and protected-class hate references. The public site copy has been neutralized so it is more suitable for Vercel review and public hosting. Do not reintroduce protected-class slurs, extremist praise, or demeaning protected-class content into a Vercel production deployment.
 
-All payment and commission actions are external links or pending placeholders. Version 1 does not process payments, collect card data, store files, or manage user accounts.
+The static website payment and commission actions are external links or pending placeholders. The backend storefront service handles Telegram catalog, Stripe Checkout handoff, verified webhooks, access grants, and delivery tokens when deployed separately.
 
 ## Deployment
 
@@ -88,6 +100,18 @@ You need:
 - Keep `.vercel/`, local `.env` files, and provider secrets out of git.
 - Replace pending payment/social placeholders before a production launch.
 - Review `docs/hosting-note.md` before publishing any less-sanitized copy.
+- Add both `hh88trance.com` and `admin.hh88trance.com` to the same Vercel project. The app detects the admin hostname and renders the admin portal there.
+- Put `admin.hh88trance.com` behind Cloudflare Access before sharing it. The portal stores drafts locally and exports JSON/TypeScript for updating `src/content.ts`; it does not publish changes automatically without a future backend.
+
+## Backend Deployment
+
+The cloneable backend source is under `backend/`. To install it to the existing private runtime boundary:
+
+```bash
+sudo backend/scripts/install_to_srv.sh
+```
+
+That script deploys the backend subtree to `/srv/storebot/app`. Keep runtime secrets in `/srv/storebot/app/.env`; do not commit `.env` files.
 
 ## Next Steps
 

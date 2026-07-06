@@ -11,7 +11,10 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@vercel/speed-insights": "^2.0.0",
     "@vitejs/plugin-react": "^5.1.1",
+    "esbuild": "^0.28.1",
+    "fsevents": "^2.3.3",
     "lucide-react": "^0.562.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
@@ -32,5 +35,11 @@
     "playwright": "^1.60.0",
     "typescript-eslint": "^8.60.0",
     "vitest": "^4.0.15"
+  },
+  "allowScripts": {
+    "fsevents@2.3.3": true,
+    "fsevents@2.3.2": true,
+    "esbuild@0.28.1": true,
+    "esbuild@0.27.7": true
   }
 }

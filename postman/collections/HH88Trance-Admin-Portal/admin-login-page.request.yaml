@@ -1,0 +1,6 @@
+$kind: http-request
+name: Admin Login Page
+method: GET
+url: '{{baseUrl}}/admin/login'
+description: Returns the HTML login page for the admin portal
+order: 1000

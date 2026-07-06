@@ -1,0 +1,5 @@
+$kind: http-request
+name: Payment Success Page
+method: GET
+url: '{{baseUrl}}/success'
+order: 7000

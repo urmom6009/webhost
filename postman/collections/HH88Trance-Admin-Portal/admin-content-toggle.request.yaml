@@ -1,0 +1,6 @@
+$kind: http-request
+name: Toggle Product Active Status
+method: POST
+url: '{{baseUrl}}/admin/content/{{productId}}/toggle'
+description: Toggles a product between active and inactive
+order: 6000

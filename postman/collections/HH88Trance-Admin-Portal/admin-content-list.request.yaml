@@ -1,0 +1,6 @@
+$kind: http-request
+name: List Content (Products)
+method: GET
+url: '{{baseUrl}}/admin/content'
+description: Returns the HTML page listing all products with their status, price, and file info
+order: 4000

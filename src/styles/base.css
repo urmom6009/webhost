@@ -1,0 +1,73 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@500;600;700;800&family=Oswald:wght@500;600;700&display=swap");
+
+:root {
+  color-scheme: dark;
+  --bg: #040405;
+  --panel: rgba(13, 14, 15, 0.9);
+  --panel-strong: rgba(18, 19, 21, 0.96);
+  --line: rgba(184, 190, 196, 0.16);
+  --line-hard: rgba(184, 190, 196, 0.34);
+  --muted: #969ca1;
+  --text: #ecebe6;
+  --red: #9d101c;
+  --red-hot: #d81b2a;
+  --steel: #9ea6ad;
+  --cyan: #aeb8c1;
+  --amber: #b69355;
+  --white: #f0eee8;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: #030304;
+  color: var(--text);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+.space-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(125deg, rgba(157, 16, 28, 0.18), transparent 28rem),
+    linear-gradient(145deg, #040405 0%, #090a0b 54%, #141416 100%);
+  background-size:
+    78px 78px,
+    78px 78px,
+    auto,
+    auto;
+}
+

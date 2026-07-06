@@ -1,0 +1,5 @@
+$kind: http-request
+name: Payment Cancel Page
+method: GET
+url: '{{baseUrl}}/cancel'
+order: 8000
