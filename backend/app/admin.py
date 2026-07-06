@@ -1,18 +1,35 @@
 import shlex
 import uuid
+import os
+import asyncio
+from pathlib import Path
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.fulfillment import build_delivery_url
-from app.models import AccessGrant, AuditEvent, DeliveryToken, File, Order, Payment, Product, User, utcnow
+from app.models import (
+    AccessGrant,
+    AuditEvent,
+    DeliveryToken,
+    File,
+    Order,
+    Payment,
+    Product,
+    User,
+    utcnow,
+)
 from app.security import valid_deeplink_payload
-from app.services.delivery import create_delivery_token, local_file_path, safe_storage_key
+from app.services.delivery import (
+    create_delivery_token,
+    local_file_path,
+    safe_storage_key,
+)
 
 router = Router()
 pending_admin_flows: dict[int, dict] = {}
@@ -122,7 +139,15 @@ async def find_product(session: AsyncSession, slug: str) -> Product | None:
 
 def apply_product_values(product: Product, values: dict[str, str]) -> list[str]:
     changed: list[str] = []
-    for field in ("title", "description", "currency", "preview_caption", "storage_provider", "file_id", "onedrive_url"):
+    for field in (
+        "title",
+        "description",
+        "currency",
+        "preview_caption",
+        "storage_provider",
+        "file_id",
+        "onedrive_url",
+    ):
         if field in values:
             setattr(product, field, values[field])
             changed.append(field)
@@ -145,30 +170,58 @@ async def attach_local_file(
     display_name: str | None = None,
     content_type: str | None = None,
 ) -> File:
+    # ensure storage_key is normalized
     safe_key = safe_storage_key(storage_key)
     path = local_file_path(safe_key)
-    if not path.is_file():
+
+    base_dir = Path(get_settings().local_storage_dir)
+    try:
+        if not path.resolve().is_relative_to(base_dir.resolve()):
+            raise ValueError("resolved path outside dir")
+    except AttributeError:
+        if not str(path.resolve()).startswith(str(base_dir.resolve()) + os.sep):
+            raise ValueError("resolved path outside dir")
+
+    try:
+        exists = await asynchio.to_thread(path.is_file)
+    except Exception as exc:
+        raise ValueError(
+            f"could not check file existence for storage_key: {safe_key}"
+        ) from exc
+
+    if not exists:
         raise ValueError(f"local file not found for storage_key: {safe_key}")
 
-    existing_result = await session.execute(
-        select(File)
+    try:
+        stat = await asynchio.to_thread(path.stat)
+        size_bytes = stat.st_size
+    except Exception as exc:
+        raise ValueError(
+            f"could not stat local file for storage_key: {safe_key}"
+        ) from exc
+
+    # deactivate previous active files with a single UPDATE for efficiency
+    await session.execute(
+        update(File)
         .where(File.product_id == product.id)
         .where(File.active.is_(True))
+        .values(active=False, updated_at=utcnow())
     )
-    for existing in existing_result.scalars().all():
-        existing.active = False
-        existing.updated_at = utcnow()
 
+    # create the  new file record
     file = File(
         product_id=product.id,
         storage_provider="local_hdd",
         storage_key=safe_key,
         display_name=display_name or path.name,
         content_type=content_type,
-        size_bytes=path.stat().st_size,
+        size_bytes=size_bytes,
         active=True,
     )
+
     session.add(file)
+
+    # flush so the field can be used in the same session
     await session.flush()
     return file
 
@@ -183,27 +236,29 @@ async def admin_help(message: Message, session: AsyncSession) -> None:
         "admin commands:\n"
         "/help\n"
         "/product_create\n"
-        "/product_create slug=\"v_aircraft_001\" title=\"aircraft video 001\" price_cents=999 currency=\"usd\" onedrive_url=\"https://...\"\n"
-        "/product_update slug=\"v_aircraft_001\" title=\"new title\" price_cents=1299 description=\"...\"\n"
-        "/product_disable slug=\"v_aircraft_001\"\n"
-        "/product_show slug=\"v_aircraft_001\"\n"
+        '/product_create slug="v_aircraft_001" title="aircraft video 001" price_cents=999 currency="usd" onedrive_url="https://..."\n'
+        '/product_update slug="v_aircraft_001" title="new title" price_cents=1299 description="..."\n'
+        '/product_disable slug="v_aircraft_001"\n'
+        '/product_show slug="v_aircraft_001"\n'
         "/product_list\n"
-        "/asset_replace slug=\"v_aircraft_001\" storage_key=\"v_aircraft_001/original.mp4\" title=\"new title\" price_cents=1299 display_name=\"Aircraft Video 001.mp4\" content_type=\"video/mp4\"\n"
-        "/file_attach slug=\"v_aircraft_001\" storage_key=\"v_aircraft_001/original.mp4\" display_name=\"Aircraft Video 001.mp4\" content_type=\"video/mp4\"\n"
-        "/file_show slug=\"v_aircraft_001\"\n"
-        "/file_disable slug=\"v_aircraft_001\"\n"
-        "/caption slug=\"v_aircraft_001\"\n"
-        "/order_lookup query=\"order_id_or_stripe_session_or_telegram_id\"\n"
+        '/asset_replace slug="v_aircraft_001" storage_key="v_aircraft_001/original.mp4" title="new title" price_cents=1299 display_name="Aircraft Video 001.mp4" content_type="video/mp4"\n'
+        '/file_attach slug="v_aircraft_001" storage_key="v_aircraft_001/original.mp4" display_name="Aircraft Video 001.mp4" content_type="video/mp4"\n'
+        '/file_show slug="v_aircraft_001"\n'
+        '/file_disable slug="v_aircraft_001"\n'
+        '/caption slug="v_aircraft_001"\n'
+        '/order_lookup query="order_id_or_stripe_session_or_telegram_id"\n'
         "/user_lookup telegram_id=123\n"
         "/debug_clear_me confirm=yes\n"
-        "/resend_delivery order_id=\"...\"\n"
-        "/revoke_access telegram_id=123 slug=\"v_aircraft_001\"\n"
-        "/refund_note order_id=\"...\" note=\"manual refund note\""
+        '/resend_delivery order_id="..."\n'
+        '/revoke_access telegram_id=123 slug="v_aircraft_001"\n'
+        '/refund_note order_id="..." note="manual refund note"'
     )
 
 
 @router.message(Command("product_create"))
-async def product_create(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def product_create(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
     if not await require_admin(session, message, "product_create"):
         return
     if not command.args:
@@ -216,7 +271,9 @@ async def product_create(message: Message, command: CommandObject, session: Asyn
         values = parse_args(command.args)
         require_fields(values, ("slug", "title", "price_cents", "currency"))
         if not valid_deeplink_payload(values["slug"]):
-            raise ValueError("slug may only contain letters, numbers, underscore, and dash")
+            raise ValueError(
+                "slug may only contain letters, numbers, underscore, and dash"
+            )
         product = Product(
             slug=values["slug"],
             title=values["title"],
@@ -226,7 +283,9 @@ async def product_create(message: Message, command: CommandObject, session: Asyn
             preview_caption=values.get("preview_caption"),
             storage_provider=values.get("storage_provider", "static_onedrive"),
             file_id=values.get("file_id"),
-            onedrive_url=values.get("onedrive_url", "https://example.invalid/local-file"),
+            onedrive_url=values.get(
+                "onedrive_url", "https://example.invalid/local-file"
+            ),
             active=True,
         )
         session.add(product)
@@ -240,7 +299,14 @@ async def product_create(message: Message, command: CommandObject, session: Asyn
                 content_type=values.get("content_type"),
             )
             product.storage_provider = "local_hdd"
-        await audit(session, message, "product_created", target_type="product", target_id=str(product.id), metadata={"slug": product.slug})
+        await audit(
+            session,
+            message,
+            "product_created",
+            target_type="product",
+            target_id=str(product.id),
+            metadata={"slug": product.slug},
+        )
         await session.commit()
         await message.answer(f"product created: {product.slug}")
     except Exception as exc:
@@ -286,7 +352,9 @@ async def handle_admin_flow(message: Message, session: AsyncSession) -> None:
     try:
         if step == "slug":
             if not valid_deeplink_payload(text):
-                raise ValueError("slug may only contain letters, numbers, underscore, and dash")
+                raise ValueError(
+                    "slug may only contain letters, numbers, underscore, and dash"
+                )
             if await find_product(session, text) is not None:
                 raise ValueError("product slug already exists")
             data["slug"] = text
@@ -319,7 +387,9 @@ async def handle_admin_flow(message: Message, session: AsyncSession) -> None:
         if step == "description":
             data["description"] = None if text == "-" else text
             flow["step"] = "storage_key"
-            await message.answer("local storage key? example: test-product/test-file.zip")
+            await message.answer(
+                "local storage key? example: test-product/test-file.zip"
+            )
             return
 
         if step == "storage_key":
@@ -331,7 +401,9 @@ async def handle_admin_flow(message: Message, session: AsyncSession) -> None:
         if step == "display_name":
             data["display_name"] = None if text == "-" else text
             flow["step"] = "content_type"
-            await message.answer("content type? example: video/mp4 or application/zip. send - to skip")
+            await message.answer(
+                "content type? example: video/mp4 or application/zip. send - to skip"
+            )
             return
 
         if step == "content_type":
@@ -361,7 +433,11 @@ async def handle_admin_flow(message: Message, session: AsyncSession) -> None:
                 "product_created",
                 target_type="product",
                 target_id=str(product.id),
-                metadata={"slug": product.slug, "storage_key": file.storage_key, "interactive": True},
+                metadata={
+                    "slug": product.slug,
+                    "storage_key": file.storage_key,
+                    "interactive": True,
+                },
             )
             await session.commit()
             pending_admin_flows.pop(actor, None)
@@ -379,7 +455,9 @@ async def handle_admin_flow(message: Message, session: AsyncSession) -> None:
 
 
 @router.message(Command("product_update"))
-async def product_update(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def product_update(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
     if not await require_admin(session, message, "product_update"):
         return
     try:
@@ -407,7 +485,9 @@ async def product_update(message: Message, command: CommandObject, session: Asyn
 
 
 @router.message(Command("asset_replace", "asset_update"))
-async def asset_replace(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def asset_replace(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
     if not await require_admin(session, message, "asset_replace"):
         return
     try:
@@ -465,7 +545,9 @@ async def asset_replace(message: Message, command: CommandObject, session: Async
 
 
 @router.message(Command("product_disable"))
-async def product_disable(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def product_disable(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
     if not await require_admin(session, message, "product_disable"):
         return
     try:
@@ -476,24 +558,42 @@ async def product_disable(message: Message, command: CommandObject, session: Asy
             raise ValueError("product not found")
         product.active = False
         product.updated_at = utcnow()
-        await audit(session, message, "product_disabled", target_type="product", target_id=str(product.id), metadata={"slug": product.slug})
+        await audit(
+            session,
+            message,
+            "product_disabled",
+            target_type="product",
+            target_id=str(product.id),
+            metadata={"slug": product.slug},
+        )
         await session.commit()
         await message.answer(f"product disabled: {product.slug}")
     except Exception as exc:
         await session.rollback()
-        await audit(session, message, "product_disabled", success=False, reason=str(exc))
+        await audit(
+            session, message, "product_disabled", success=False, reason=str(exc)
+        )
         await session.commit()
         await message.answer(f"could not disable product: {exc}")
 
 
 @router.message(Command("product_show"))
-async def product_show(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def product_show(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
     if not await require_admin(session, message, "product_show"):
         return
     values = parse_args(command.args)
     require_fields(values, ("slug",))
     product = await find_product(session, values["slug"])
-    await audit(session, message, "product_show", target_type="product", target_id=str(product.id) if product else None, success=product is not None)
+    await audit(
+        session,
+        message,
+        "product_show",
+        target_type="product",
+        target_id=str(product.id) if product else None,
+        success=product is not None,
+    )
     await session.commit()
     if product is None:
         await message.answer("product not found.")
@@ -518,11 +618,18 @@ async def product_list(message: Message, session: AsyncSession) -> None:
     if not products:
         await message.answer("no products found.")
         return
-    await message.answer("\n".join(f"{p.slug} | {p.price_cents} {p.currency.upper()} | active={p.active}" for p in products))
+    await message.answer(
+        "\n".join(
+            f"{p.slug} | {p.price_cents} {p.currency.upper()} | active={p.active}"
+            for p in products
+        )
+    )
 
 
 @router.message(Command("file_attach"))
-async def file_attach(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def file_attach(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
     if not await require_admin(session, message, "file_attach"):
         return
     try:
@@ -558,7 +665,9 @@ async def file_attach(message: Message, command: CommandObject, session: AsyncSe
 
 
 @router.message(Command("file_show"))
-async def file_show(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def file_show(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
     if not await require_admin(session, message, "file_show"):
         return
     try:
@@ -573,7 +682,14 @@ async def file_show(message: Message, command: CommandObject, session: AsyncSess
             .order_by(File.active.desc(), File.created_at.desc())
         )
         files = result.scalars().all()
-        await audit(session, message, "file_show", target_type="product", target_id=str(product.id), metadata={"slug": product.slug})
+        await audit(
+            session,
+            message,
+            "file_show",
+            target_type="product",
+            target_id=str(product.id),
+            metadata={"slug": product.slug},
+        )
         await session.commit()
         if not files:
             await message.answer("no files attached.")
@@ -592,7 +708,9 @@ async def file_show(message: Message, command: CommandObject, session: AsyncSess
 
 
 @router.message(Command("file_disable"))
-async def file_disable(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def file_disable(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
     if not await require_admin(session, message, "file_disable"):
         return
     try:
@@ -628,32 +746,55 @@ async def file_disable(message: Message, command: CommandObject, session: AsyncS
 
 
 @router.message(Command("caption"))
-async def caption(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def caption(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
     if not await require_admin(session, message, "caption"):
         return
     values = parse_args(command.args)
     require_fields(values, ("slug",))
     product = await find_product(session, values["slug"])
-    await audit(session, message, "caption_generated", target_type="product", target_id=str(product.id) if product else None, success=product is not None)
+    await audit(
+        session,
+        message,
+        "caption_generated",
+        target_type="product",
+        target_id=str(product.id) if product else None,
+        success=product is not None,
+    )
     await session.commit()
     if product is None:
         await message.answer("product not found.")
         return
     link = f"https://t.me/{get_settings().telegram_bot_username}?start={product.slug}"
-    caption_text = product.preview_caption or f"{product.title}\n{product.description or ''}".strip()
+    caption_text = (
+        product.preview_caption
+        or f"{product.title}\n{product.description or ''}".strip()
+    )
     await message.answer(f"{caption_text}\n\n{link}")
 
 
 @router.message(Command("order_lookup"))
-async def order_lookup(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def order_lookup(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
     if not await require_admin(session, message, "order_lookup"):
         return
     values = parse_args(command.args)
-    query = values.get("query") or values.get("order_id") or values.get("stripe_session_id") or values.get("telegram_id")
+    query = (
+        values.get("query")
+        or values.get("order_id")
+        or values.get("stripe_session_id")
+        or values.get("telegram_id")
+    )
     if not query:
         await message.answer("missing query.")
         return
-    stmt = select(Order).options(selectinload(Order.user), selectinload(Order.product), selectinload(Order.payments))
+    stmt = select(Order).options(
+        selectinload(Order.user),
+        selectinload(Order.product),
+        selectinload(Order.payments),
+    )
     try:
         order_uuid = uuid.UUID(query)
         stmt = stmt.where(Order.id == order_uuid)
@@ -664,7 +805,13 @@ async def order_lookup(message: Message, command: CommandObject, session: AsyncS
             stmt = stmt.join(Payment).where(Payment.provider_session_id == query)
     result = await session.execute(stmt.order_by(Order.created_at.desc()))
     orders = result.unique().scalars().all()
-    await audit(session, message, "order_lookup", success=bool(orders), metadata={"query_kind": "safe_lookup"})
+    await audit(
+        session,
+        message,
+        "order_lookup",
+        success=bool(orders),
+        metadata={"query_kind": "safe_lookup"},
+    )
     await session.commit()
     if not orders:
         await message.answer("no matching orders.")
@@ -680,29 +827,46 @@ async def order_lookup(message: Message, command: CommandObject, session: AsyncS
 
 
 @router.message(Command("user_lookup"))
-async def user_lookup(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def user_lookup(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
     if not await require_admin(session, message, "user_lookup"):
         return
     values = parse_args(command.args)
     require_fields(values, ("telegram_id",))
-    result = await session.execute(select(User).where(User.telegram_id == int(values["telegram_id"])))
+    result = await session.execute(
+        select(User).where(User.telegram_id == int(values["telegram_id"]))
+    )
     user = result.scalar_one_or_none()
-    await audit(session, message, "user_lookup", target_type="user", target_id=str(user.id) if user else values["telegram_id"], success=user is not None)
+    await audit(
+        session,
+        message,
+        "user_lookup",
+        target_type="user",
+        target_id=str(user.id) if user else values["telegram_id"],
+        success=user is not None,
+    )
     await session.commit()
     if user is None:
         await message.answer("user not found.")
         return
-    await message.answer(f"telegram_id: {user.telegram_id}\nusername: {user.username or ''}\nfirst_name: {user.first_name or ''}")
+    await message.answer(
+        f"telegram_id: {user.telegram_id}\nusername: {user.username or ''}\nfirst_name: {user.first_name or ''}"
+    )
 
 
 @router.message(Command("debug_clear_me"))
-async def debug_clear_me(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def debug_clear_me(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
     if not await require_admin(session, message, "debug_clear_me"):
         return
     try:
         values = parse_args(command.args)
         if not parse_bool(values.get("confirm", "")):
-            await message.answer("this clears your buyer user, orders, payments, grants, and delivery tokens. rerun with /debug_clear_me confirm=yes")
+            await message.answer(
+                "this clears your buyer user, orders, payments, grants, and delivery tokens. rerun with /debug_clear_me confirm=yes"
+            )
             return
 
         actor = actor_id(message)
@@ -712,7 +876,14 @@ async def debug_clear_me(message: Message, command: CommandObject, session: Asyn
         result = await session.execute(select(User).where(User.telegram_id == actor))
         user = result.scalar_one_or_none()
         if user is None:
-            await audit(session, message, "debug_clear_me", target_type="user", target_id=str(actor), metadata={"deleted": False})
+            await audit(
+                session,
+                message,
+                "debug_clear_me",
+                target_type="user",
+                target_id=str(actor),
+                metadata={"deleted": False},
+            )
             await session.commit()
             await message.answer("no buyer entries found for your Telegram account.")
             return
@@ -769,7 +940,9 @@ async def debug_clear_me(message: Message, command: CommandObject, session: Asyn
 
 
 @router.message(Command("resend_delivery"))
-async def resend_delivery(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def resend_delivery(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
     if not await require_admin(session, message, "resend_delivery"):
         return
     try:
@@ -778,20 +951,39 @@ async def resend_delivery(message: Message, command: CommandObject, session: Asy
         order_id = uuid.UUID(values["order_id"])
         result = await session.execute(
             select(Order)
-            .options(selectinload(Order.user), selectinload(Order.product), selectinload(Order.access_grants))
+            .options(
+                selectinload(Order.user),
+                selectinload(Order.product),
+                selectinload(Order.access_grants),
+            )
             .where(Order.id == order_id)
         )
         order = result.scalar_one_or_none()
         if order is None:
             raise ValueError("order not found")
-        grant = next((candidate for candidate in order.access_grants if candidate.status == "active"), None)
+        grant = next(
+            (
+                candidate
+                for candidate in order.access_grants
+                if candidate.status == "active"
+            ),
+            None,
+        )
         if grant is None:
             raise ValueError("active grant not found")
         raw_token = await create_delivery_token(session, grant)
         delivery_url = await build_delivery_url(raw_token)
-        await audit(session, message, "delivery_resent", target_type="order", target_id=str(order.id))
+        await audit(
+            session,
+            message,
+            "delivery_resent",
+            target_type="order",
+            target_id=str(order.id),
+        )
         await session.commit()
-        await message.answer(f"fresh delivery link for {order.product.slug}:\n{delivery_url}")
+        await message.answer(
+            f"fresh delivery link for {order.product.slug}:\n{delivery_url}"
+        )
     except Exception as exc:
         await session.rollback()
         await audit(session, message, "delivery_resent", success=False, reason=str(exc))
@@ -800,7 +992,9 @@ async def resend_delivery(message: Message, command: CommandObject, session: Asy
 
 
 @router.message(Command("revoke_access"))
-async def revoke_access(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def revoke_access(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
     if not await require_admin(session, message, "revoke_access"):
         return
     try:
@@ -818,7 +1012,14 @@ async def revoke_access(message: Message, command: CommandObject, session: Async
         for grant in grants:
             grant.status = "revoked"
             grant.revoked_at = utcnow()
-        await audit(session, message, "access_revoked", target_type="product", target_id=values["slug"], metadata={"grant_count": len(grants)})
+        await audit(
+            session,
+            message,
+            "access_revoked",
+            target_type="product",
+            target_id=values["slug"],
+            metadata={"grant_count": len(grants)},
+        )
         await session.commit()
         await message.answer(f"revoked grants: {len(grants)}")
     except Exception as exc:
@@ -829,7 +1030,9 @@ async def revoke_access(message: Message, command: CommandObject, session: Async
 
 
 @router.message(Command("refund_note"))
-async def refund_note(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def refund_note(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
     if not await require_admin(session, message, "refund_note"):
         return
     try:
@@ -852,6 +1055,8 @@ async def refund_note(message: Message, command: CommandObject, session: AsyncSe
         await message.answer("refund note recorded.")
     except Exception as exc:
         await session.rollback()
-        await audit(session, message, "manual_refund_recorded", success=False, reason=str(exc))
+        await audit(
+            session, message, "manual_refund_recorded", success=False, reason=str(exc)
+        )
         await session.commit()
         await message.answer(f"could not record refund note: {exc}")
