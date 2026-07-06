@@ -216,7 +216,6 @@ function downloadFile(name: string, body: string, type = "application/json") {
 function summarize(content: AdminContent) {
   const allLinks = [...content.contactLinks, ...content.socialLinks];
   const pendingLinks = allLinks.filter((link) => link.pending || link.href.startsWith("#pending")).length;
-  const exampleContacts = allLinks.filter((link) => link.href.includes("example.com")).length;
   const emptyVideos = [...content.customVideos, ...content.mainVideos].filter((video) => !video.title.trim() || !video.price.trim()).length;
   return {
     videoCount: content.customVideos.length + content.mainVideos.length,
