@@ -40,8 +40,8 @@ jobs:
           APISEC_MAX_CRITICAL: "0"
           APISEC_MAX_HIGH: "5"
           APISEC_MAIL_REPORT: "true"
-        
-        run: 
+      - name: running of action
+        run: |
           docker run -rm \
             -e APISEC_TOKEN \
             -e APISEC_HOST \
