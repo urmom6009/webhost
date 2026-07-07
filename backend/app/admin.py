@@ -174,7 +174,7 @@ async def attach_local_file(
     safe_key = safe_storage_key(storage_key)
     path = local_file_path(safe_key)
 
-    base_dir = Path(get_settings().local_storage_dir)
+    base_dir = Path(get_settings().download_storage_root)
     try:
         if not path.resolve().is_relative_to(base_dir.resolve()):
             raise ValueError("resolved path outside dir")
@@ -183,7 +183,7 @@ async def attach_local_file(
             raise ValueError("resolved path outside dir")
 
     try:
-        exists = await asynchio.to_thread(path.is_file)
+        exists = await asyncio.to_thread(path.is_file)
     except Exception as exc:
         raise ValueError(
             f"could not check file existence for storage_key: {safe_key}"
@@ -193,7 +193,7 @@ async def attach_local_file(
         raise ValueError(f"local file not found for storage_key: {safe_key}")
 
     try:
-        stat = await asynchio.to_thread(path.stat)
+        stat = await asyncio.to_thread(path.stat)
         size_bytes = stat.st_size
     except Exception as exc:
         raise ValueError(

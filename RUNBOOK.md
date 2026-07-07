@@ -2,7 +2,15 @@
 
 ## Deploy
 
-From a cloned repository, install the backend subtree to the private runtime path first:
+Frontend deploys are handled by `.github/workflows/vercel-deploy.yml`:
+
+- pushes to any non-`main` branch create or update a Vercel Preview deployment after validation passes
+- pull requests create Vercel Preview deployments after validation passes
+- pushes or merged pull requests that update `main` create a Vercel Production deployment after validation passes
+
+The workflow requires GitHub repository secrets named `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`.
+
+For the private backend, install the backend subtree to the runtime path first:
 
 ```bash
 sudo backend/scripts/install_to_srv.sh
@@ -43,11 +51,14 @@ curl -fsS "$PUBLIC_BASE_URL/ready"
 
 ## Stripe Test
 
-1. Send a Telegram deep link for an active product.
-2. Complete Stripe test checkout.
-3. Confirm the Stripe webhook returns 200.
-4. Confirm `orders.status=paid`, one `access_grants` row exists, and one delivery token was created.
-5. Redeem the delivery URL once and verify redirect.
+1. Open a website purchase link such as `https://api.hh88trance.com/buy/file-11` and confirm it redirects to the Telegram bot for the matching active product.
+2. Send a Telegram deep link for the same active product.
+3. Complete Stripe test checkout.
+4. Confirm the Stripe webhook returns 200.
+5. Confirm `orders.status=paid`, one `access_grants` row exists, and one delivery token was created.
+6. Redeem the delivery URL once and verify redirect.
+
+Website purchase buttons must not create orders directly. They should only hit the backend `/buy/<slug>` redirect, and the bot should remain responsible for creating the Stripe Checkout Session after a Telegram account is linked.
 
 ## Admin Smoke Test
 

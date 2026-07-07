@@ -15,6 +15,16 @@ describe("App routing and interactions", () => {
     expect(screen.getByRole("button", { name: /customcommission files/i })).toBeInTheDocument();
   });
 
+  it("renders product-specific website purchase links", () => {
+    window.history.pushState({}, "", "/videos/main");
+    render(<App />);
+
+    expect(screen.getByRole("link", { name: /buy file 11 through telegram and stripe/i })).toHaveAttribute(
+      "href",
+      "https://api.hh88trance.com/buy/file-11"
+    );
+  });
+
   it("expands about accordions", () => {
     window.history.pushState({}, "", "/about");
     render(<App />);

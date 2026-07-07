@@ -5,7 +5,7 @@ Secure Telegram storefront service for digital video delivery.
 The phase 1 flow is:
 
 ```text
-telegram preview caption -> bot deep link -> product lookup -> stripe checkout
+website /buy/<slug> or telegram preview caption -> bot deep link -> product lookup -> stripe checkout
 -> verified stripe webhook -> database access grant -> gated delivery token
 -> temporary redirect to static OneDrive URL
 ```
@@ -78,6 +78,16 @@ docker compose exec app alembic upgrade head
 
 Development may set `AUTO_MIGRATE=true`, but production should keep it false.
 
+## Test Database
+
+The default backend pytest fixture uses in-memory SQLite for fast local unit tests. To exercise the same Postgres family used in production, run tests with Docker available and opt into Testcontainers:
+
+```bash
+USE_TESTCONTAINERS=1 .venv/bin/python -m pytest
+```
+
+This starts a disposable `postgres:16-alpine` container, rewrites `DATABASE_URL` to the container's asyncpg URL before app modules import, creates a fresh schema per test, and stops the container when pytest exits.
+
 ## Product Seed
 
 After migrations:
@@ -90,6 +100,21 @@ docker compose exec app python -m app.seed \
   --currency usd \
   --onedrive-url "https://example.invalid/temporary-dev-link"
 ```
+
+The public website links to these slugs through `/buy/<slug>`:
+
+```text
+custom-4-mtx
+custom-3-cdl
+custom-2-ritual
+custom-1-power
+file-11
+file-10
+file-9
+file-8
+```
+
+Use the same slug in the admin portal or seed command for each active delivery file. The `/buy/<slug>` route intentionally returns `404` for missing, disabled, or invalid slugs so inactive products cannot be purchased from stale website links.
 
 ## Admin Commands
 

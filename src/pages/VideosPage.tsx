@@ -1,5 +1,5 @@
 import { ChevronLeft, Play } from "lucide-react";
-import { customVideos, mainVideos, type VideoFile } from "../content";
+import { customVideos, mainVideos, productPurchaseUrl, type VideoFile } from "../content";
 import { navigateTo } from "../app/routing";
 
 export function VideosLanding() {
@@ -62,6 +62,8 @@ function InfoPanel({ title, copy, strong }: { title: string; copy: string; stron
 
 
 function VideoCard({ video }: { video: VideoFile }) {
+  const purchaseUrl = productPurchaseUrl(video.productSlug);
+
   return (
     <article className="video-card">
       <div className={`video-still still-${video.kind}`}>
@@ -78,13 +80,18 @@ function VideoCard({ video }: { video: VideoFile }) {
         <p className="creator">{video.creator}</p>
         {video.duration ? <span className="duration">{video.duration}</span> : null}
         <p className="meta">{video.meta.join(" | ")}</p>
-        <a className="buy-button" href="#pending-video-payment" aria-label={`${video.title} payment link pending`}>
-          Buy Now {video.price}
+        <a
+          className="buy-button"
+          href={purchaseUrl}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Buy ${video.title} through Telegram and Stripe`}
+        >
+          Buy via Telegram {video.price}
         </a>
       </div>
     </article>
   );
 }
-
 
 

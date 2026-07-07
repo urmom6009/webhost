@@ -13,8 +13,9 @@ from app.bot import bot, configure_command_menu, dp
 from app.config import get_settings
 from app.db import SessionLocal, init_db
 from app.fulfillment import build_delivery_url, fulfill_paid_order
-from app.models import Order, Payment, ProviderEvent
+from app.models import Order, Payment, Product, ProviderEvent
 from app.portal import router as portal_router
+from app.security import telegram_bot_deeplink, valid_deeplink_payload
 from app.services.delivery import redeem_delivery_token
 from app.services.stripe_service import configure_stripe
 
@@ -143,6 +144,30 @@ async def stripe_webhook(
             return JSONResponse({"received": True, "delivery_message_sent": False})
 
     return JSONResponse({"received": True})
+
+
+@app.get("/buy/{product_slug}")
+async def product_purchase_redirect(product_slug: str) -> RedirectResponse:
+    if not valid_deeplink_payload(product_slug):
+        raise HTTPException(status_code=404, detail="product not found")
+
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(Product)
+            .where(Product.slug == product_slug)
+            .where(Product.active.is_(True))
+        )
+        product = result.scalar_one_or_none()
+
+    if product is None:
+        raise HTTPException(status_code=404, detail="product not found")
+
+    try:
+        target = telegram_bot_deeplink(settings.telegram_bot_username, product.slug)
+    except ValueError:
+        raise HTTPException(status_code=503, detail="telegram bot username is not configured")
+
+    return RedirectResponse(target, status_code=302)
 
 
 async def handle_checkout_session_completed(session, checkout_session) -> dict | None:

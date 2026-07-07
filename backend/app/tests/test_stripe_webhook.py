@@ -10,6 +10,28 @@ from app.models import AccessGrant, DeliveryToken, Order, Payment, Product, User
 from app.services.stripe_service import create_checkout_session
 
 
+class FakeScalarResult:
+    def __init__(self, product):
+        self.product = product
+
+    def scalar_one_or_none(self):
+        return self.product
+
+
+class FakeSessionContext:
+    def __init__(self, product):
+        self.product = product
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def execute(self, statement):
+        return FakeScalarResult(self.product)
+
+
 async def create_pending_stripe_order(session):
     user = User(telegram_id=2002, username="buyer", first_name="Buyer")
     product = Product(
@@ -141,3 +163,32 @@ async def test_wrong_amount_does_not_grant_access(session):
     assert grants == []
     assert payment.status == "amount_mismatch"
     assert order.status == "payment_mismatch"
+
+
+@pytest.mark.asyncio
+async def test_product_purchase_redirect_uses_active_product_slug(monkeypatch):
+    product = Product(
+        slug="file-11",
+        title="File 11",
+        description="test",
+        price_cents=8000,
+        currency="usd",
+        onedrive_url="https://onedrive.test/file",
+        active=True,
+    )
+    monkeypatch.setattr(main, "SessionLocal", lambda: FakeSessionContext(product))
+
+    response = await main.product_purchase_redirect("file-11")
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "https://t.me/StorefrontTestBot?start=file-11"
+
+
+@pytest.mark.asyncio
+async def test_product_purchase_redirect_rejects_disabled_product(monkeypatch):
+    monkeypatch.setattr(main, "SessionLocal", lambda: FakeSessionContext(None))
+
+    with pytest.raises(HTTPException) as exc_info:
+        await main.product_purchase_redirect("file-11")
+
+    assert exc_info.value.status_code == 404
