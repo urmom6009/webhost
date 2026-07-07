@@ -20,8 +20,37 @@ describe("App routing and interactions", () => {
     render(<App />);
 
     expect(
-      screen.getByRole("link", { name: /buy file 11 through telegram and stripe/i }).hasAttribute("href", "https://api.hh88trance.com/buy/file-11");
+      screen.getByRole("link", { name: /buy file 11 through telegram and stripe/i })
+    ).toHaveAttribute("href", "https://api.hh88trance.com/buy/file-11");
   });
+
+  it("renders custom video website purchase links", () => {
+    window.history.pushState({}, "", "/videos/custom");
+    render(<App />);
+
+    // Adjust the accessible name to match the custom video card rendered at /videos/custom
+    expect(
+      screen.getByRole("link", { name: /buy custom video through telegram and stripe/i })
+    ).toHaveAttribute("href", "https://api.hh88trance.com/buy/custom-video");
+  });
+
+  it("uses configurable storefront base URL for website purchase links", () => {
+    const originalBaseUrl = import.meta.env.VITE_STOREFRONT_BASE_URL;
+    import.meta.env.VITE_STOREFRONT_BASE_URL = "https://store.example.com";
+
+    try {
+      window.history.pushState({}, "", "/videos/main");
+      render(<App />);
+
+      expect(
+        screen.getByRole("link", { name: /buy file 11 through telegram and stripe/i })
+      ).toHaveAttribute("href", "https://store.example.com/buy/file-11");
+    } finally {
+      import.meta.env.VITE_STOREFRONT_BASE_URL = originalBaseUrl;
+    }
+  });
+
+
   it("renders custom video website purchase links", () => {
     window.history.pushState({}, "", "/videos/custom");
     render(<App />);
