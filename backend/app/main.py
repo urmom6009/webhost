@@ -1,10 +1,12 @@
 import uuid
+import time
+from collections import Counter
 from contextlib import asynccontextmanager
 
 import stripe
 from aiogram.types import Update
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
@@ -20,6 +22,8 @@ from app.services.delivery import redeem_delivery_token
 from app.services.stripe_service import configure_stripe
 
 settings = get_settings()
+REQUEST_TOTAL: Counter[tuple[str, str, str]] = Counter()
+REQUEST_DURATION_SUM: Counter[tuple[str, str, str]] = Counter()
 
 
 @asynccontextmanager
@@ -41,6 +45,17 @@ app = FastAPI(
 app.include_router(portal_router)
 
 
+@app.middleware("http")
+async def collect_http_metrics(request: Request, call_next):
+    started = time.perf_counter()
+    response = await call_next(request)
+    route = getattr(request.scope.get("route"), "path", request.url.path)
+    labels = (request.method, route, str(response.status_code))
+    REQUEST_TOTAL[labels] += 1
+    REQUEST_DURATION_SUM[labels] += time.perf_counter() - started
+    return response
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -56,6 +71,64 @@ async def ready() -> dict[str, str]:
     async with SessionLocal() as session:
         await session.execute(text("select 1"))
     return {"status": "ready"}
+
+
+def metric_label(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "")
+
+
+@app.get("/metrics")
+async def metrics() -> Response:
+    db_ready = 0
+    try:
+        async with SessionLocal() as session:
+            await session.execute(text("select 1"))
+        db_ready = 1
+    except Exception:
+        db_ready = 0
+
+    lines = [
+        "# HELP hh88trance_app_info Application metadata.",
+        "# TYPE hh88trance_app_info gauge",
+        f'hh88trance_app_info{{version="{metric_label(settings.app_version)}"}} 1',
+        "# HELP hh88trance_db_ready Database readiness status.",
+        "# TYPE hh88trance_db_ready gauge",
+        f"hh88trance_db_ready {db_ready}",
+        "# HELP hh88trance_http_requests_total HTTP requests by method, route, and status.",
+        "# TYPE hh88trance_http_requests_total counter",
+    ]
+    for (method, route, status), count in sorted(REQUEST_TOTAL.items()):
+        lines.append(
+            'hh88trance_http_requests_total{'
+            f'method="{metric_label(method)}",route="{metric_label(route)}",status="{metric_label(status)}"'
+            f"}} {count}"
+        )
+    lines.extend(
+        [
+            "# HELP hh88trance_http_request_duration_seconds_sum Total HTTP request duration by method, route, and status.",
+            "# TYPE hh88trance_http_request_duration_seconds_sum counter",
+        ]
+    )
+    for (method, route, status), total in sorted(REQUEST_DURATION_SUM.items()):
+        lines.append(
+            'hh88trance_http_request_duration_seconds_sum{'
+            f'method="{metric_label(method)}",route="{metric_label(route)}",status="{metric_label(status)}"'
+            f"}} {total:.6f}"
+        )
+    lines.extend(
+        [
+            "# HELP hh88trance_http_request_duration_seconds_count HTTP request duration sample count by method, route, and status.",
+            "# TYPE hh88trance_http_request_duration_seconds_count counter",
+        ]
+    )
+    for (method, route, status), count in sorted(REQUEST_TOTAL.items()):
+        lines.append(
+            'hh88trance_http_request_duration_seconds_count{'
+            f'method="{metric_label(method)}",route="{metric_label(route)}",status="{metric_label(status)}"'
+            f"}} {count}"
+        )
+
+    return Response("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
 
 
 @app.post(settings.telegram_webhook_path)

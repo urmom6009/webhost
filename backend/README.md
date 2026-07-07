@@ -42,7 +42,7 @@ Do not add `storebot` or a friend account to the `sudo` or `docker` groups.
 
 ## Runtime
 
-Primary approach: rootless Docker as `storebot`.
+Primary approach: Docker Compose as `storebot`.
 
 ```bash
 sudo loginctl enable-linger storebot
@@ -51,12 +51,12 @@ dockerd-rootless-setuptool.sh install
 cd /srv/storebot/app
 docker compose build
 docker compose up -d
-docker compose exec app alembic upgrade head
+curl -fsS http://127.0.0.1:${WEB_HTTP_PORT:-8080}/ready
 ```
 
 Fallback: Podman Compose under `storebot` if rootless Docker is unavailable.
 
-The default compose stack publishes no host ports. Cloudflare Tunnel connects outbound and routes the public hostname to `http://app:8000`.
+The default compose stack publishes the `web` entrypoint and observability UIs on localhost only. Cloudflare Tunnel, Caddy, Tailscale, or another private edge should route the public hostname to `http://127.0.0.1:${WEB_HTTP_PORT:-8080}`.
 
 For rootless Docker, install the user-level unit as `storebot`:
 
@@ -70,10 +70,10 @@ systemctl --user enable --now storebot.service
 
 ## Migrations
 
-Production does not create tables on startup. Run:
+Production does not create tables on API startup. The Compose `migrate` service runs:
 
 ```bash
-docker compose exec app alembic upgrade head
+alembic upgrade head
 ```
 
 Development may set `AUTO_MIGRATE=true`, but production should keep it false.
@@ -93,10 +93,10 @@ This starts a disposable `postgres:16-alpine` container, rewrites `DATABASE_URL`
 After migrations:
 
 ```bash
-docker compose exec app python -m app.seed \
-  --slug v_aircraft_001 \
-  --title "aircraft video 001" \
-  --price-cents 999 \
+docker compose exec api python -m app.seed \
+  --slug file-11 \
+  --title "File 11" \
+  --price-cents 8000 \
   --currency usd \
   --onedrive-url "https://example.invalid/temporary-dev-link"
 ```

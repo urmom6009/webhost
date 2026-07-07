@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-src_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+src_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 dest_dir="${DEST_DIR:-/srv/storebot/app}"
 service_user="${SERVICE_USER:-storebot}"
 service_group="${SERVICE_GROUP:-storebot}"
@@ -22,8 +22,12 @@ chmod 700 /srv/storebot/secrets /srv/storebot/backups
 
 rsync -a --delete \
   --exclude '.env' \
+  --exclude '.env.*' \
   --exclude '.venv' \
   --exclude '.git' \
+  --exclude 'node_modules' \
+  --exclude 'dist' \
+  --exclude 'coverage' \
   --exclude '__pycache__' \
   --exclude '.pytest_cache' \
   --exclude 'backups' \
@@ -36,7 +40,7 @@ rsync -a --delete \
 chown -R "$service_user:$service_group" "$dest_dir"
 find "$dest_dir" -type d -exec chmod 750 {} +
 find "$dest_dir" -type f -exec chmod 640 {} +
-find "$dest_dir/scripts" -type f -name '*.sh' -exec chmod 750 {} +
+find "$dest_dir/backend/scripts" -type f -name '*.sh' -exec chmod 750 {} +
 
 if [[ -f "$dest_dir/.env" ]]; then
   chown "$service_user:$service_group" "$dest_dir/.env"
