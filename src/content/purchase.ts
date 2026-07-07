@@ -1,7 +1,7 @@
 const DEFAULT_STOREFRONT_BASE_URL = "https://api.hh88trance.com";
 const PRODUCT_SLUG_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
-function storefrontBaseUrl() {
+export function storefrontBaseUrl() {
   return (import.meta.env.VITE_STOREFRONT_BASE_URL || DEFAULT_STOREFRONT_BASE_URL).replace(/\/+$/, "");
 }
 
@@ -15,4 +15,8 @@ export function productPurchaseUrl(productSlug: string) {
   }
 
   return `${storefrontBaseUrl()}/buy/${encodeURIComponent(productSlug)}`;
+}
+
+export function productCatalogUrl() {
+  return `${storefrontBaseUrl()}/catalog`;
 }

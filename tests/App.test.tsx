@@ -29,10 +29,9 @@ describe("App routing and interactions", () => {
     window.history.pushState({}, "", "/videos/custom");
     render(<App />);
 
-    // adjust the accessible name to match custom video card rendered at /video/custom
     expect(
-      screen.getByRole("link", { name: /buy custom video through telegram and stripe/i })
-    ).toHaveAttribute("href", "https://api.hh88trance.com/buy/custom-video");
+      screen.getByRole("link", { name: /buy custom 4 - mtx through telegram and stripe/i })
+    ).toHaveAttribute("href", "https://api.hh88trance.com/buy/custom-4-mtx");
   });
 
   it("uses configurable storefront base URL for website purchasing links", () => {
@@ -45,7 +44,7 @@ describe("App routing and interactions", () => {
 
       expect(
         screen.getByRole("link", { name: /buy file 11 through telegram and stripe/i })
-      ).toHaveAttribute("href", "https://store.example/buy/file-11");
+      ).toHaveAttribute("href", "https://store.example.com/buy/file-11");
     } finally {
       import.meta.env.VITE_STOREFRONT_BASE_URL = originalBaseUrl;
     }

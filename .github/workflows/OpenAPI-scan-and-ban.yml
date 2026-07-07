@@ -10,27 +10,25 @@ on:
       - main
       - dev
   schedule:
-      - cron: '34 4 * * 2'
-  
-  workflow_dispatch: 
+    - cron: "34 4 * * 2"
+
+  workflow_dispatch:
 
 permissions:
   contents: write
-  pull-requests: write    
-
+  pull-requests: write
 
 jobs:
-
   Trigger_APIsec_scan:
     permissions:
       security-events: write
       actions: read
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Run APIsec scan and enforce thresholds (Docker)
         id: scan
-        uses: apisec-inc/apisec-run-scan-and-gate@latest
+        uses: apisec-inc/apisec-run-scan@v1.0.7
         env:
           APISEC_TOKEN: ${{ secrets.APISEC_TOKEN }}
           APISEC_HOST: https://api.apisecapps.com
@@ -49,4 +47,4 @@ jobs:
             -e APISEC_INSTANCE_ID \
             -e APISEC_AUTH_ID \
             -e APISEC_MAX_CRITICAL \
-            -e APISEC_MAX_HIGH 
+            -e APISEC_MAX_HIGH

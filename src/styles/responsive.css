@@ -29,6 +29,7 @@
   }
 
   .hero,
+  .videos-overview,
   .listing-page,
   .about-page,
   .contact-page,
@@ -65,6 +66,26 @@
 
   .landing-card span {
     margin-top: 32vh;
+  }
+
+  .catalog-status,
+  .info-heading {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-status strong,
+  .catalog-status small {
+    justify-self: start;
+  }
+
+  .info-heading {
+    flex-direction: column;
+  }
+
+  .info-heading span {
+    width: fit-content;
+    margin-top: 0;
   }
 
   .feature-card {
@@ -134,4 +155,3 @@
     min-height: auto;
   }
 }
-

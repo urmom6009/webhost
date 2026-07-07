@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 import stripe
 from aiogram.types import Update
 from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
@@ -41,6 +42,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="telegram storefront mvp",
     lifespan=lifespan,
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET"],
+    allow_headers=["*"],
 )
 app.include_router(portal_router)
 
@@ -129,6 +136,34 @@ async def metrics() -> Response:
         )
 
     return Response("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
+
+
+def public_catalog_product(product: Product) -> dict:
+    return {
+        "slug": product.slug,
+        "title": product.title,
+        "description": product.description,
+        "preview_caption": product.preview_caption,
+        "price_cents": product.price_cents,
+        "currency": product.currency,
+        "updated_at": product.updated_at.isoformat() if product.updated_at else None,
+    }
+
+
+@app.get("/catalog")
+async def catalog() -> dict:
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(Product)
+            .where(Product.active.is_(True))
+            .order_by(Product.created_at.desc())
+        )
+        products = list(result.scalars().all())
+
+    return {
+        "products": [public_catalog_product(product) for product in products],
+        "count": len(products),
+    }
 
 
 @app.post(settings.telegram_webhook_path)
