@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it } from "vitest";
 import { App } from "../src/App";
 
@@ -20,7 +21,8 @@ describe("App routing and interactions", () => {
     render(<App />);
 
     expect(
-      screen.getByRole("link", { name: /buy file 11 through telegram and stripe/i }).toHaveAttribute("href", "https://api.hh88trance.com/buy/file-11");
+      screen.getByRole("link", { name: /buy file 11 through telegram and stripe/i })
+    ).toHaveAttribute("href", "https://api.hh88trance.com/buy/file-11");
   });
 
   it("renders custom video website purchase links", () => {
@@ -29,7 +31,8 @@ describe("App routing and interactions", () => {
 
     // adjust the accessible name to match custom video card rendered at /video/custom
     expect(
-      screen.getByRole("link", { name: /buy custom video through telegram and stripe/i }).toHaveAttribute("href", "https://api.hh88trance.com/buy/custom-video");
+      screen.getByRole("link", { name: /buy custom video through telegram and stripe/i })
+    ).toHaveAttribute("href", "https://api.hh88trance.com/buy/custom-video");
   });
 
   it("uses configurable storefront base URL for website purchasing links", () => {
@@ -41,7 +44,8 @@ describe("App routing and interactions", () => {
       render(<App />);
 
       expect(
-        screen.getByRole("link", { name: /buy file 11 through telegram and stripe/i }).hasAttribute("href", "https://store.example/buy/file-11");
+        screen.getByRole("link", { name: /buy file 11 through telegram and stripe/i })
+      ).toHaveAttribute("href", "https://store.example/buy/file-11");
     } finally {
       import.meta.env.VITE_STOREFRONT_BASE_URL = originalBaseUrl;
     }
