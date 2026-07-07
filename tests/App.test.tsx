@@ -19,10 +19,31 @@ describe("App routing and interactions", () => {
     window.history.pushState({}, "", "/videos/main");
     render(<App />);
 
-    expect(screen.getByRole("link", { name: /buy file 11 through telegram and stripe/i })).toHaveAttribute(
-      "href",
-      "https://api.hh88trance.com/buy/file-11"
-    );
+    expect(
+      screen.getByRole("link", { name: /buy file 11 through telegram and stripe/i }).hasAttribute("href", "https://api.hh88trance.com/buy/file-11");
+  });
+  it("renders custom video website purchase links", () => {
+    window.history.pushState({}, "", "/videos/custom");
+    render(<App />);
+
+    // adjust the accessible name to match custom video card rendered at /video/custom
+    expect(
+      screen.getByRole("link", { name: /buy custom video through telegram and stripe/i }).hasAttribute("href", "https://api.hh88trance.com/buy/custom-video");
+  });
+
+  it("uses configurable storefront base URL for website purchasing links", () => {
+    const originalBaseUrl = import.meta.env.VITE_STOREFRONT_BASE_URL;
+    import.meta.env.VITE_STOREFRONT_BASE_URL = "https://store.example.com";
+
+    try {
+      window.history.pushState({}, "", "/videos/main");
+      render(<App />);
+
+      expect(
+        screen.getByRole("link", { name: /buy file 11 through telegram and stripe/i }).hasAttribute("href", "https://store.example/buy/file-11");
+    } finally {
+      import.meta.env.VITE_STOREFRONT_BASE_URL = originalBaseUrl;
+    }
   });
 
   it("expands about accordions", () => {

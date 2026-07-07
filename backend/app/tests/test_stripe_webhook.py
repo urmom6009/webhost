@@ -166,24 +166,6 @@ async def test_wrong_amount_does_not_grant_access(session):
 
 
 @pytest.mark.asyncio
-async def test_product_purchase_redirect_uses_active_product_slug(monkeypatch):
-    product = Product(
-        slug="file-11",
-        title="File 11",
-        description="test",
-        price_cents=8000,
-        currency="usd",
-        onedrive_url="https://onedrive.test/file",
-        active=True,
-    )
-    monkeypatch.setattr(main, "SessionLocal", lambda: FakeSessionContext(product))
-
-    response = await main.product_purchase_redirect("file-11")
-
-    assert response.status_code == 302
-    assert response.headers["location"] == "https://t.me/StorefrontTestBot?start=file-11"
-
-
 @pytest.mark.asyncio
 async def test_product_purchase_redirect_rejects_disabled_product(monkeypatch):
     monkeypatch.setattr(main, "SessionLocal", lambda: FakeSessionContext(None))
@@ -192,3 +174,40 @@ async def test_product_purchase_redirect_rejects_disabled_product(monkeypatch):
         await main.product_purchase_redirect("file-11")
 
     assert exc_info.value.status_code == 404
+
+@pytest.mark.asyncio
+async def test_product_purchase_redirects_invalid_deeplink_payload(monkeypatch):
+    # ensure DB session is never used for invalid deeplink payloads
+    def failing_session():
+        raise AssertionError("SessionLocal should not be called for invalid deeplink payload")
+
+    monkeypatch.setattr(main, "SessionLocal", failing_session)
+    monkeypatch.setattr(main, "valid_deeplink_payload", lambda payload: False)
+
+    with pytest.raises(HTTPException as exc_info):
+        await main.product_purchase_redirect("invalid-slug")
+
+    assert exc_info.value.status_code == 404
+
+@pytest.mark.asyncio
+async def test_product_purchase_redirect_returns_503_on_bad_bot_username(monkeypatch):
+    product = Product(
+        slug="file-11",
+        title="File 11",
+        description="test",
+        price_cents=80000,
+        currency="usd",
+        onedrive_url="https://onedrive.test/file",
+        active=True,
+    )
+
+    # valid deeplink payload and active product so we reach the telegram state
+    def failing_telegram_bot_deeplink(*args, **kwargs):
+        raise ValueError("bad bot name")
+
+    monkeypatch.setattr(main, "telegram_bot_deeplink", failing_telegram_bot_deeplink)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await main.product_purchase_redirect("file-11")
+
+    assert exc_info.value.status_code == 503

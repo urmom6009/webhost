@@ -4,7 +4,7 @@ services:
     container_name: tailscale
     hostname: tailscale-nginx
     environment:
-      - TS_AUTHKEY={{ secrets.TS_AUTHKEY }}
+      - TS_AUTHKEY=${{ secrets.TS_AUTHKEY }}
       - TS_STATE_DIR=/var/lib/tailscale
     volumes:
       - ./tailscale-state:/var/lib/tailscale
