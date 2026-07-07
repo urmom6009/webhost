@@ -7,7 +7,8 @@ export const customVideos: VideoFile[] = [
     meta: ["Trance", "Pressure ritual", "Spoken word", "Unique audio"],
     price: "$80.00",
     kind: "custom",
-    visual: "custom 4"
+    visual: "custom 4",
+    productSlug: "custom-4-mtx"
   },
   {
     title: "Custom 3 - CDL",
@@ -15,7 +16,8 @@ export const customVideos: VideoFile[] = [
     meta: ["Trance", "Identity pressure", "Soft spoken", "Unique audio"],
     price: "$80.00",
     kind: "custom",
-    visual: "custom 3"
+    visual: "custom 3",
+    productSlug: "custom-3-cdl"
   },
   {
     title: "Custom 2 - Ritual",
@@ -23,7 +25,8 @@ export const customVideos: VideoFile[] = [
     meta: ["Hypno", "ASMR", "Identity loop", "Quiet vocals", "Unique audio"],
     price: "$80.00",
     kind: "custom",
-    visual: "custom 2"
+    visual: "custom 2",
+    productSlug: "custom-2-ritual"
   },
   {
     title: "Custom 1 - Power",
@@ -31,7 +34,8 @@ export const customVideos: VideoFile[] = [
     meta: ["Trance", "Visual loop", "Affirmation file", "Full quality"],
     price: "$80.00",
     kind: "custom",
-    visual: "custom 1"
+    visual: "custom 1",
+    productSlug: "custom-1-power"
   }
 ];
 
@@ -43,7 +47,8 @@ export const mainVideos: VideoFile[] = [
     duration: "1 hour max length",
     price: "$80.00",
     kind: "main",
-    visual: "file 11"
+    visual: "file 11",
+    productSlug: "file-11"
   },
   {
     title: "File 10",
@@ -52,7 +57,8 @@ export const mainVideos: VideoFile[] = [
     duration: "1 hour max length",
     price: "$80.00",
     kind: "main",
-    visual: "file 10"
+    visual: "file 10",
+    productSlug: "file-10"
   },
   {
     title: "File 9",
@@ -61,7 +67,8 @@ export const mainVideos: VideoFile[] = [
     duration: "1 hour max length",
     price: "$80.00",
     kind: "main",
-    visual: "file 9"
+    visual: "file 9",
+    productSlug: "file-9"
   },
   {
     title: "File 8",
@@ -70,7 +77,7 @@ export const mainVideos: VideoFile[] = [
     duration: "1 hour max length",
     price: "$80.00",
     kind: "main",
-    visual: "file 8"
+    visual: "file 8",
+    productSlug: "file-8"
   }
 ];
-

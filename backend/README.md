@@ -5,7 +5,7 @@ Secure Telegram storefront service for digital video delivery.
 The phase 1 flow is:
 
 ```text
-telegram preview caption -> bot deep link -> product lookup -> stripe checkout
+website /buy/<slug> or telegram preview caption -> bot deep link -> product lookup -> stripe checkout
 -> verified stripe webhook -> database access grant -> gated delivery token
 -> temporary redirect to static OneDrive URL
 ```
@@ -42,7 +42,7 @@ Do not add `storebot` or a friend account to the `sudo` or `docker` groups.
 
 ## Runtime
 
-Primary approach: rootless Docker as `storebot`.
+Primary approach: Docker Compose as `storebot`.
 
 ```bash
 sudo loginctl enable-linger storebot
@@ -51,12 +51,12 @@ dockerd-rootless-setuptool.sh install
 cd /srv/storebot/app
 docker compose build
 docker compose up -d
-docker compose exec app alembic upgrade head
+curl -fsS http://127.0.0.1:${WEB_HTTP_PORT:-8080}/ready
 ```
 
 Fallback: Podman Compose under `storebot` if rootless Docker is unavailable.
 
-The default compose stack publishes no host ports. Cloudflare Tunnel connects outbound and routes the public hostname to `http://app:8000`.
+The default compose stack publishes the `web` entrypoint and observability UIs on localhost only. Cloudflare Tunnel, Caddy, Tailscale, or another private edge should route the public hostname to `http://127.0.0.1:${WEB_HTTP_PORT:-8080}`.
 
 For rootless Docker, install the user-level unit as `storebot`:
 
@@ -70,26 +70,51 @@ systemctl --user enable --now storebot.service
 
 ## Migrations
 
-Production does not create tables on startup. Run:
+Production does not create tables on API startup. The Compose `migrate` service runs:
 
 ```bash
-docker compose exec app alembic upgrade head
+alembic upgrade head
 ```
 
 Development may set `AUTO_MIGRATE=true`, but production should keep it false.
+
+## Test Database
+
+The default backend pytest fixture uses in-memory SQLite for fast local unit tests. To exercise the same Postgres family used in production, run tests with Docker available and opt into Testcontainers:
+
+```bash
+USE_TESTCONTAINERS=1 .venv/bin/python -m pytest
+```
+
+This starts a disposable `postgres:16-alpine` container, rewrites `DATABASE_URL` to the container's asyncpg URL before app modules import, creates a fresh schema per test, and stops the container when pytest exits.
 
 ## Product Seed
 
 After migrations:
 
 ```bash
-docker compose exec app python -m app.seed \
-  --slug v_aircraft_001 \
-  --title "aircraft video 001" \
-  --price-cents 999 \
+docker compose exec api python -m app.seed \
+  --slug file-11 \
+  --title "File 11" \
+  --price-cents 8000 \
   --currency usd \
   --onedrive-url "https://example.invalid/temporary-dev-link"
 ```
+
+The public website links to these slugs through `/buy/<slug>`:
+
+```text
+custom-4-mtx
+custom-3-cdl
+custom-2-ritual
+custom-1-power
+file-11
+file-10
+file-9
+file-8
+```
+
+Use the same slug in the admin portal or seed command for each active delivery file. The `/buy/<slug>` route intentionally returns `404` for missing, disabled, or invalid slugs so inactive products cannot be purchased from stale website links.
 
 ## Admin Commands
 

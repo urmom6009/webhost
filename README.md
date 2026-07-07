@@ -1,6 +1,6 @@
 # HH88TRANCE
 
-Vercel-ready React site plus the Telegram storefront backend for the HH88TRANCE adult audio/video brand.
+Docker Compose-ready React site plus the Telegram storefront backend for the HH88TRANCE adult audio/video brand.
 
 The first implementation follows the provided PDF references from `/Users/colinvargas/Downloads/HH88Trance-Web` for page structure, dark starfield styling, neon navigation, card density, and adult-brand tone. Public copy is intentionally sanitized for Vercel hosting risk.
 
@@ -11,7 +11,7 @@ The first implementation follows the provided PDF references from `/Users/colinv
 - TypeScript
 - Vitest and Testing Library
 - ESLint
-- Vercel static hosting with SPA rewrites
+- Docker Compose main runtime with Nginx, FastAPI, Postgres, Prometheus, and Grafana
 - FastAPI Telegram/Stripe storefront backend under `backend/`
 - Pytest and Alembic for backend validation and migrations
 
@@ -25,7 +25,9 @@ The first implementation follows the provided PDF references from `/Users/colinv
 - `npm run preview` serves the production build locally.
 - `python -m venv .venv && .venv/bin/python -m pip install -r requirements.txt` creates a local backend test environment.
 - `.venv/bin/python -m pytest` runs the Telegram storefront backend tests.
+- `USE_TESTCONTAINERS=1 .venv/bin/python -m pytest` runs backend tests against a disposable Postgres 16 container when Docker is available.
 - `.venv/bin/alembic upgrade head` runs backend migrations using `backend/alembic`.
+- `docker compose build && docker compose up -d` starts the production-shaped local/runtime stack.
 
 ## Project Structure
 
@@ -56,62 +58,65 @@ The first implementation follows the provided PDF references from `/Users/colinv
 - `admin.hh88trance.com` renders the private admin portal for static content editing
 - `/admin` renders the same portal only during local development and test runs
 
-The site uses client-side routing with `vercel.json` rewrites so deep links load through `index.html`.
+The Compose `web` container uses Nginx SPA routing so deep links load through `index.html`. Backend paths such as `/buy/*`, `/stripe/*`, `/telegram/*`, `/dl/*`, `/admin*`, `/download-file/*`, `/health`, `/ready`, and `/metrics` are proxied to internal containers.
 
 ## Content And Hosting Notes
 
 The source PDFs include explicit and protected-class hate references. The public site copy has been neutralized so it is more suitable for Vercel review and public hosting. Do not reintroduce protected-class slurs, extremist praise, or demeaning protected-class content into a Vercel production deployment.
 
-The static website payment and commission actions are external links or pending placeholders. The backend storefront service handles Telegram catalog, Stripe Checkout handoff, verified webhooks, access grants, and delivery tokens when deployed separately.
+The static website video purchase buttons point to the backend storefront redirect at `https://api.hh88trance.com/buy/<product-slug>`. The backend validates that the product is active, opens the matching Telegram bot deep link, and the bot then creates the Stripe Checkout Session. Verified Stripe webhooks remain the only fulfillment path for access grants and delivery tokens.
+
+Do not put `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, database URLs, bot tokens, or delivery secrets in frontend code. The website only needs the public storefront base URL at build time if the backend hostname differs from the browser origin:
+
+```text
+VITE_STOREFRONT_BASE_URL=https://api.hh88trance.com
+```
 
 ## Deployment
 
-These steps assume this is your first time using Vercel and that you want the simplest path: connect GitHub, import the site, and let Vercel publish it for you.
+The main runtime is Docker Compose.
 
-### Before You Start
+```bash
+cp .env.example .env
+chmod 600 .env
+# edit .env
+docker compose build
+docker compose up -d
+curl -fsS http://127.0.0.1:${WEB_HTTP_PORT:-8080}/ready
+```
 
-You need:
+Default local URLs:
 
-- A GitHub account.
-- A Vercel account. You can sign up at https://vercel.com with the same GitHub account.
-- The finished version of this repository pushed to GitHub.
-- Final links for any payment, social, email, or commission buttons you want visitors to use.
+- Site/API entrypoint: `http://127.0.0.1:8080`
+- Prometheus: `http://127.0.0.1:9090`
+- Grafana: `http://127.0.0.1:3000`
 
-### First-Time Vercel Steps
+Keep `.env` and provider secrets out of git. Keep `WEB_BIND` and `OBS_BIND` on `127.0.0.1` when a reverse proxy or tunnel publishes the site.
 
-1. Create or sign in to your Vercel account at https://vercel.com.
-2. Choose **Add New...** and then **Project**.
-3. Connect your GitHub account if Vercel asks for permission.
-4. Select the GitHub repository for this website.
-5. On the import screen, Vercel should detect this as a Vite project. Keep these settings:
-   - Build command: `npm run build`
-   - Output directory: `dist`
-   - Install command: `npm install`
-6. Leave environment variables blank unless a future feature specifically requires them.
-7. Click **Deploy**.
-8. Wait for Vercel to finish the build. If it succeeds, Vercel will show a live preview URL.
-9. Open the preview URL and click through every page before sharing it publicly.
+## Server Installation
 
-### After Deployment
-
-- If the site looks right, use the Vercel dashboard to add a custom domain when ready.
-- If Vercel reports a build error, read the first red error message in the deployment log and fix that issue before redeploying.
-- Every time you push a new change to the GitHub repository, Vercel will automatically build and publish a fresh version.
-- Keep `.vercel/`, local `.env` files, and provider secrets out of git.
-- Replace pending payment/social placeholders before a production launch.
-- Review `docs/hosting-note.md` before publishing any less-sanitized copy.
-- Add both `hh88trance.com` and `admin.hh88trance.com` to the same Vercel project. The app detects the admin hostname and renders the admin portal there.
-- Put `admin.hh88trance.com` behind Cloudflare Access before sharing it. The portal stores drafts locally and exports JSON/TypeScript for updating `src/content.ts`; it does not publish changes automatically without a future backend.
-
-## Backend Deployment
-
-The cloneable backend source is under `backend/`. To install it to the existing private runtime boundary:
+To install the full repo to the existing private runtime boundary:
 
 ```bash
 sudo backend/scripts/install_to_srv.sh
 ```
 
-That script deploys the backend subtree to `/srv/storebot/app`. Keep runtime secrets in `/srv/storebot/app/.env`; do not commit `.env` files.
+That script deploys the repository to `/srv/storebot/app`. Keep runtime secrets in `/srv/storebot/app/.env`; do not commit `.env` files.
+
+The website video cards expect these backend product slugs:
+
+```text
+custom-4-mtx
+custom-3-cdl
+custom-2-ritual
+custom-1-power
+file-11
+file-10
+file-9
+file-8
+```
+
+Use the backend admin portal or `python -m app.seed` from `/srv/storebot/app` to create active products with those exact slugs and attached delivery files. A website purchase link returns `404` until the matching product is active.
 
 ## Next Steps
 
@@ -133,10 +138,10 @@ For a non-technical owner, the safest workflow is to finish content first, then 
    - Patreon.
    - Social/DM profiles.
    - Commission email or form destination.
-4. Decide the final hosting platform:
-   - Use Vercel only with sanitized public copy.
-   - Choose a more adult-content-tolerant host if the final brand requires explicit copy that Vercel may reject.
-5. Run a simple launch check in the Vercel preview:
+4. Confirm the public edge:
+   - Route the domain or tunnel to `http://127.0.0.1:${WEB_HTTP_PORT:-8080}`.
+   - Keep Postgres, Prometheus, and Grafana bound to localhost unless intentionally exposed through private access.
+5. Run a simple launch check against the Compose entrypoint:
    - Verify every route on desktop and mobile.
    - Confirm the 18+ gate persists as expected.
    - Confirm all external links open correctly.
@@ -150,4 +155,4 @@ For a non-technical owner, the safest workflow is to finish content first, then 
    - Social preview image.
    - Favicon and app icons.
    - Privacy/contact details with real business contact information.
-8. After the preview is approved, share the Vercel URL or connect a custom domain from the Vercel dashboard.
+8. After the preview is approved, point the production domain or tunnel at the Compose web entrypoint.

@@ -15,6 +15,7 @@ export type VideoFile = {
   duration?: string;
   kind: "custom" | "main";
   visual: string;
+  productSlug: string;
 };
 
 export type LinkItem = {
@@ -34,4 +35,3 @@ export type DrainPlan = {
   cadence: string;
   description: string;
 };
-

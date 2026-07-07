@@ -14,4 +14,4 @@ if [[ ! -f "$backup_path" ]]; then
 fi
 
 echo "restoring ${backup_path}"
-gunzip -c "$backup_path" | docker compose exec -T postgres psql -U store store
+gunzip -c "$backup_path" | docker compose exec -T db psql -U storefront storefront

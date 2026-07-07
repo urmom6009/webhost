@@ -3,7 +3,12 @@ set -euo pipefail
 
 fail=0
 
-if docker compose config | grep -qE 'published:|0\.0\.0\.0:5432|0\.0\.0\.0:6379|/var/run/docker.sock|network_mode: host|privileged: true'; then
+if [[ ! -f .env ]]; then
+  echo ".env is required for docker compose config validation" >&2
+  fail=1
+fi
+
+if [[ -f .env ]] && docker compose config | grep -qE '0\.0\.0\.0:5432|0\.0\.0\.0:6379|/var/run/docker.sock|network_mode: host|privileged: true'; then
   echo "compose security check failed: public/internal exposure or dangerous container setting found" >&2
   fail=1
 fi

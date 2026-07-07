@@ -8,7 +8,7 @@ backup_path="${backup_dir}/store_${stamp}.sql.gz"
 mkdir -p "$backup_dir"
 chmod 700 "$backup_dir"
 
-docker compose exec -T postgres pg_dump -U store store | gzip > "$backup_path"
+docker compose exec -T db pg_dump -U storefront storefront | gzip > "$backup_path"
 chmod 600 "$backup_path"
 
 echo "wrote ${backup_path}"
