@@ -126,6 +126,14 @@ curl -fsS http://127.0.0.1:${WEB_HTTP_PORT:-8080}/ready
 
 Website purchase buttons must not create orders directly. They should only hit the backend `/buy/<slug>` redirect, and the bot should remain responsible for creating the Stripe Checkout Session after a Telegram account is linked.
 
+The public video pages poll `/catalog` for active product cards. After changing catalog/backend code, rebuild and recreate both `web` and `api`; after style-only frontend changes, rebuild and recreate `web`.
+
+```bash
+curl -fsS https://YOUR_DOMAIN/catalog
+```
+
+The response must include only display-safe product fields and active products. If the response is empty, the website will show the no-files empty state.
+
 ## Admin Smoke Test
 
 ```text

@@ -170,7 +170,11 @@ function contentTs(content: AdminContent) {
     )
     .join(",\n");
 
-  return `// Paste these array bodies into src/content.ts. Keep the imports, nav arrays, types, and findomCards/icons exports.
+  return `// Paste these array bodies into the split files under src/content/.
+// Videos: src/content/catalog.ts
+// Links: src/content/links.ts
+// About: src/content/about.ts
+// Drain plans: src/content/findom.ts
 export const customVideos: VideoFile[] = [
 ${videos(content.customVideos)}
 ];
@@ -678,7 +682,8 @@ function ExportPanel({
           aria-label="Import admin JSON"
         />
         <p className="admin-note">
-          Exported JSON is useful for handing edits to a developer. The TypeScript output is the closest match for updating `src/content.ts`.
+          Exported JSON is useful for handing edits to a developer. The TypeScript output is the closest match for updating files under
+          `src/content/`.
         </p>
         <FileJson className="panel-watermark" size={72} aria-hidden="true" />
       </article>

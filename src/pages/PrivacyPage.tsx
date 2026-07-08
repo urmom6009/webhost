@@ -1,8 +1,10 @@
 export function PrivacyPage() {
   return (
     <section className="page-shell privacy-page">
-      <h1>Privacy Policy</h1>
-      <p className="subhead">HH88TRANCE</p>
+      <div className="section-hero compact">
+        <h1>Privacy Policy</h1>
+        <p className="subhead">HH88TRANCE</p>
+      </div>
       <p className="privacy-intro">
         Your privacy is important. This policy outlines how this static site handles personal information for adult-oriented content,
         commissions, and external purchase links.
@@ -24,5 +26,4 @@ export function PrivacyPage() {
     </section>
   );
 }
-
 

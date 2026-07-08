@@ -14,15 +14,17 @@ export function BrandHeader({ path }: { path: string }) {
 
   return (
     <header className="site-header">
-      <button className="money-banner" onClick={() => navigateTo("/")} aria-label="HH88TRANCE home">
-        <span className="brand-mark">HH88TRANCE</span>
-        <span className="brand-kicker">Adult trance files | Findom systems | Custom commissions</span>
-      </button>
-      <nav className="main-nav" aria-label="Primary navigation">
-        {groupedNav.map(({ parent, children }) => (
-          <NavGroup key={parent.href} item={parent} childrenItems={children} path={path} activeSection={section === parent.section} />
-        ))}
-      </nav>
+      <div className="header-frame">
+        <button className="brand-home" onClick={() => navigateTo("/")} aria-label="HH88TRANCE home">
+          <span className="brand-mark">HH88TRANCE</span>
+          <span className="brand-kicker">Adult trance files | Findom systems | Custom commissions</span>
+        </button>
+        <nav className="main-nav" aria-label="Primary navigation">
+          {groupedNav.map(({ parent, children }) => (
+            <NavGroup key={parent.href} item={parent} childrenItems={children} path={path} activeSection={section === parent.section} />
+          ))}
+        </nav>
+      </div>
     </header>
   );
 }
@@ -65,6 +67,5 @@ export function NavButton({ item, active, nested = false }: { item: NavItem; act
     </button>
   );
 }
-
 
 

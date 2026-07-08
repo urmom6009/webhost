@@ -1,6 +1,6 @@
 # Admin Portal
 
-The admin portal is rendered when the site is loaded from:
+The public React app contains a lightweight local content editor. It is rendered when the site is loaded from:
 
 ```text
 admin.hh88trance.com
@@ -14,7 +14,7 @@ For local development and tests, it is also available while Vite runs in develop
 
 ## What It Does
 
-The portal provides a browser-based editor for the static content model in `src/content.ts`:
+The portal provides a browser-based editor for the checked-in public content model under `src/content/`:
 
 - Custom and main video cards
 - Payment, tribute, social, and contact links
@@ -24,14 +24,33 @@ The portal provides a browser-based editor for the static content model in `src/
 
 Drafts are saved to `localStorage` under `hh88-admin-content-v1`. This makes editing comfortable behind Cloudflare Access, but it does not publish changes by itself.
 
-Use the **Export** tab to copy or download the edited JSON and generated TypeScript array bodies. To publish the update, apply the generated arrays to `src/content.ts`, run tests/build, commit, and deploy.
+Use the **Export** tab to copy or download the edited JSON and generated TypeScript array bodies. To publish the update, apply the generated arrays to the matching split file, run tests/build, commit, rebuild the Compose images, and deploy.
 
-## Vercel Setup
+Target files:
 
-1. Deploy this repository as the main HH88TRANCE Vercel project.
-2. In the Vercel project dashboard, add `admin.hh88trance.com` under **Settings > Domains**.
-3. Point the DNS record for `admin.hh88trance.com` to Vercel using the value Vercel provides.
-4. Keep `vercel.json` as-is. The existing SPA rewrite sends the admin hostname to `index.html`, and the React app switches to the admin portal by hostname.
+- Videos: `src/content/catalog.ts`
+- Links: `src/content/links.ts`
+- About accordion copy: `src/content/about.ts`
+- Recurring drain plans: `src/content/findom.ts`
+
+## Compose Setup
+
+The main runtime is Docker Compose. The public `web` container serves the React bundle and proxies backend paths to internal services. After content changes:
+
+```bash
+npm run lint
+npm test
+npm run build
+docker compose build web
+docker compose up -d web
+```
+
+If backend catalog behavior changed, rebuild and recreate `api` as well:
+
+```bash
+docker compose build api
+docker compose up -d api
+```
 
 ## Security Boundary
 
