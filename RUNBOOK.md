@@ -2,7 +2,7 @@
 
 ## Compose Runtime
 
-This repository is now designed to run as a self-contained Docker Compose stack. The public entrypoint is the `web` container; it serves the React site and proxies backend paths to internal services.
+This repository is now designed to run as a self-contained Docker Compose stack. The public entrypoint is the `web` container; it serves the React site and uses host-aware routing for backend paths.
 
 Default local bindings:
 
@@ -48,26 +48,26 @@ The `migrate` service runs `alembic upgrade head` before the API starts. Do not 
 
 ## Telegram Webhook
 
-After the stack is healthy and `PUBLIC_BASE_URL` points to the Compose web entrypoint:
+After the stack is healthy and `PUBLIC_BASE_URL` points to `https://serve.hh88trance.com`:
 
 ```bash
 backend/scripts/set_webhook.sh
 ```
 
-The public edge must route these paths to the Compose `web` entrypoint:
+The public edge must route these hostnames to the Compose `web` entrypoint:
 
 ```text
-/
-/buy/*
-/telegram/*
-/stripe/*
-/dl/*
-/download-file/*
-/admin*
-/health
-/ready
-/metrics
+hh88trance.com
+www.hh88trance.com
+serve.hh88trance.com
+admin.hh88trance.com
 ```
+
+The `web` container then applies the traffic split:
+
+- `hh88trance.com` / `www.hh88trance.com`: public SPA routes and browser deep links.
+- `serve.hh88trance.com`: `/catalog`, `/buy/*`, `/telegram/*`, `/stripe/*`, `/dl/*`, `/download-file/*`, `/success`, `/cancel`, `/health`, `/ready`, and `/version`.
+- `admin.hh88trance.com`: `/admin*` only, backed by the admin portal token login and signed session cookie.
 
 ## Observability
 
@@ -117,7 +117,7 @@ curl -fsS http://127.0.0.1:${WEB_HTTP_PORT:-8080}/ready
 
 ## Stripe Test
 
-1. Open a website purchase link such as `https://YOUR_DOMAIN/buy/file-11` and confirm it redirects to the Telegram bot for the matching active product.
+1. Open a website purchase link such as `https://serve.hh88trance.com/buy/file-11` and confirm it redirects to the Telegram bot for the matching active product.
 2. Send a Telegram deep link for the same active product.
 3. Complete Stripe test checkout.
 4. Confirm the Stripe webhook returns 200.
@@ -129,7 +129,7 @@ Website purchase buttons must not create orders directly. They should only hit t
 The public video pages poll `/catalog` for active product cards. After changing catalog/backend code, rebuild and recreate both `web` and `api`; after style-only frontend changes, rebuild and recreate `web`.
 
 ```bash
-curl -fsS https://YOUR_DOMAIN/catalog
+curl -fsS https://serve.hh88trance.com/catalog
 ```
 
 The response must include only display-safe product fields and active products. If the response is empty, the website will show the no-files empty state.
@@ -152,7 +152,7 @@ Only Telegram IDs in `ADMIN_TELEGRAM_IDS` should receive admin output. Denied ad
 Open:
 
 ```text
-https://YOUR_DOMAIN/admin
+https://admin.hh88trance.com/admin
 ```
 
 Use the `ADMIN_PORTAL_TOKEN` from `.env` to connect. The portal should redirect to `/admin/content` and show the content list plus the upload form.

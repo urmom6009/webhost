@@ -29,7 +29,7 @@ describe("site content model", () => {
 
       expect(new Set(slugs).size).toBe(slugs.length);
       expect(slugs.every(isValidProductSlug)).toBe(true);
-      expect(productPurchaseUrl("file-11")).toBe("https://api.hh88trance.com/buy/file-11");
+      expect(productPurchaseUrl("file-11")).toBe("https://serve.hh88trance.com/buy/file-11");
     });
 
     it("rejects invalid product slugs", () => {

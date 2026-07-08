@@ -1,20 +1,22 @@
 # Admin Portal
 
-The public React app contains a lightweight local content editor. It is rendered when the site is loaded from:
+Production admin traffic is handled by the backend admin portal, not the public React app. It is served from:
 
 ```text
 admin.hh88trance.com
 ```
 
-For local development and tests, it is also available while Vite runs in development mode at:
+The portal requires `ADMIN_PORTAL_TOKEN`, sets a signed HTTP-only session cookie, and should be kept behind the admin hostname and any edge access policy you enable.
+
+For local development and tests, the static React content editor is still available while Vite runs in development mode at:
 
 ```text
 /admin
 ```
 
-## What It Does
+## Local Static Editor
 
-The portal provides a browser-based editor for the checked-in public content model under `src/content/`:
+The local static editor provides a browser-based editor for the checked-in public content model under `src/content/`:
 
 - Custom and main video cards
 - Payment, tribute, social, and contact links
@@ -22,7 +24,7 @@ The portal provides a browser-based editor for the checked-in public content mod
 - About-page accordion copy
 - Launch-readiness checks for placeholder links and empty video fields
 
-Drafts are saved to `localStorage` under `hh88-admin-content-v1`. This makes editing comfortable behind Cloudflare Access, but it does not publish changes by itself.
+Drafts are saved to `localStorage` under `hh88-admin-content-v1`. This does not publish changes by itself.
 
 Use the **Export** tab to copy or download the edited JSON and generated TypeScript array bodies. To publish the update, apply the generated arrays to the matching split file, run tests/build, commit, rebuild the Compose images, and deploy.
 
@@ -54,6 +56,4 @@ docker compose up -d api
 
 ## Security Boundary
 
-The current portal is a static client-side tool. It is suitable for launch status, public site content editing, and future admin module framing, but it must not store or expose customer data, payment data, commission details, credentials, or private files.
-
-Cloudflare Access is the intended perimeter for `admin.hh88trance.com`. Before using it for real operations or automatic publishing, add server-side authentication and a private backend. Do not rely on client-side passwords or hidden routes for production access control.
+The production admin hostname routes to the backend portal under `/admin*`. Do not expose the local static editor on the production admin hostname, and do not store customer data, payment data, commission details, credentials, or private files in the static editor.

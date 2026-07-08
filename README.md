@@ -56,10 +56,14 @@ The public site now uses a refined dark catalog system: hard-edged frames, steel
 - `/about`
 - `/contact`
 - `/privacy`
-- `admin.hh88trance.com` renders the private admin portal for static content editing
+- `admin.hh88trance.com` routes to the backend admin portal with token login and a signed HTTP-only session cookie
 - `/admin` renders the same portal only during local development and test runs
 
-The Compose `web` container uses Nginx SPA routing so deep links load through `index.html`. Backend paths such as `/catalog`, `/buy/*`, `/stripe/*`, `/telegram/*`, `/dl/*`, `/admin*`, `/download-file/*`, `/health`, `/ready`, and `/metrics` are proxied to internal containers.
+The Compose `web` container uses host-aware Nginx routing:
+
+- `hh88trance.com` and `www.hh88trance.com` serve the public SPA so public deep links load through `index.html`.
+- `serve.hh88trance.com` proxies API, catalog, purchase, webhook, and delivery-token traffic to internal backend containers.
+- `admin.hh88trance.com` proxies only `/admin*` to the backend admin portal; other paths return `404`.
 
 ## Content And Hosting Notes
 
@@ -67,12 +71,12 @@ The source PDFs include explicit and protected-class hate references. The public
 
 The website video pages poll the backend catalog at `/catalog` every 15 seconds and again when the tab regains focus. When the catalog is reachable, only active backend products are shown; if no active products exist, the pages show an empty state. If the catalog cannot be reached, the site falls back to the checked-in catalog arrays in `src/content/catalog.ts`.
 
-Website purchase buttons point to the backend storefront redirect at `https://api.hh88trance.com/buy/<product-slug>`. The backend validates that the product is active, opens the matching Telegram bot deep link, and the bot then creates the Stripe Checkout Session. Verified Stripe webhooks remain the only fulfillment path for access grants and delivery tokens.
+Website purchase buttons point to the backend storefront redirect at `https://serve.hh88trance.com/buy/<product-slug>`. The backend validates that the product is active, opens the matching Telegram bot deep link, and the bot then creates the Stripe Checkout Session. Verified Stripe webhooks remain the only fulfillment path for access grants and delivery tokens.
 
 Do not put `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, database URLs, bot tokens, or delivery secrets in frontend code. The website only needs the public storefront base URL at build time if the backend hostname differs from the browser origin:
 
 ```text
-VITE_STOREFRONT_BASE_URL=https://api.hh88trance.com
+VITE_STOREFRONT_BASE_URL=https://serve.hh88trance.com
 ```
 
 ## Deployment
@@ -142,7 +146,7 @@ For a non-technical owner, the safest workflow is to finish content first, then 
    - Social/DM profiles.
    - Commission email or form destination.
 4. Confirm the public edge:
-   - Route the domain or tunnel to `http://127.0.0.1:${WEB_HTTP_PORT:-8080}`.
+   - Route `hh88trance.com`, `www.hh88trance.com`, `serve.hh88trance.com`, and `admin.hh88trance.com` to `http://127.0.0.1:${WEB_HTTP_PORT:-8080}` or the shared `hh88trance-web:8080` proxy target.
    - Keep Postgres, Prometheus, and Grafana bound to localhost unless intentionally exposed through private access.
 5. Run a simple launch check against the Compose entrypoint:
    - Verify every route on desktop and mobile.

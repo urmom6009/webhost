@@ -22,7 +22,7 @@ describe("App routing and interactions", () => {
 
     expect(
       screen.getByRole("link", { name: /buy file 11 through telegram and stripe/i })
-    ).toHaveAttribute("href", "https://api.hh88trance.com/buy/file-11");
+    ).toHaveAttribute("href", "https://serve.hh88trance.com/buy/file-11");
   });
 
   it("renders custom video website purchase links", () => {
@@ -31,7 +31,7 @@ describe("App routing and interactions", () => {
 
     expect(
       screen.getByRole("link", { name: /buy custom 4 - mtx through telegram and stripe/i })
-    ).toHaveAttribute("href", "https://api.hh88trance.com/buy/custom-4-mtx");
+    ).toHaveAttribute("href", "https://serve.hh88trance.com/buy/custom-4-mtx");
   });
 
   it("uses configurable storefront base URL for website purchasing links", () => {

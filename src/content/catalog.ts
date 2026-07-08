@@ -4,7 +4,9 @@ export const customVideos: VideoFile[] = [
   {
     title: "Undergoing maintenance",
     creator: "HH88TRANCE (Custom)",
+    meta: ["Custom", "Maintenance", "Unavailable"],
     price: "$80.00",
+    kind: "custom",
     visual: "custom 4",
     productSlug: "under-construction"
   },
