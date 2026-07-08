@@ -2,41 +2,12 @@ import type { VideoFile } from "./types";
 
 export const customVideos: VideoFile[] = [
   {
-    title: "Custom 4 - MTX",
-    creator: "HH88TRANCE (Commissioned)",
-    meta: ["Trance", "Pressure ritual", "Spoken word", "Unique audio"],
+    title: "Undergoing maintenance",
+    creator: "HH88TRANCE (Custom)",
     price: "$80.00",
-    kind: "custom",
     visual: "custom 4",
-    productSlug: "custom-4-mtx"
+    productSlug: "under-construction"
   },
-  {
-    title: "Custom 3 - CDL",
-    creator: "HH88TRANCE (Commissioned)",
-    meta: ["Trance", "Identity pressure", "Soft spoken", "Unique audio"],
-    price: "$80.00",
-    kind: "custom",
-    visual: "custom 3",
-    productSlug: "custom-3-cdl"
-  },
-  {
-    title: "Custom 2 - Ritual",
-    creator: "HH88TRANCE (Commissioned)",
-    meta: ["Hypno", "ASMR", "Identity loop", "Quiet vocals", "Unique audio"],
-    price: "$80.00",
-    kind: "custom",
-    visual: "custom 2",
-    productSlug: "custom-2-ritual"
-  },
-  {
-    title: "Custom 1 - Power",
-    creator: "HH88TRANCE (Commissioned)",
-    meta: ["Trance", "Visual loop", "Affirmation file", "Full quality"],
-    price: "$80.00",
-    kind: "custom",
-    visual: "custom 1",
-    productSlug: "custom-1-power"
-  }
 ];
 
 export const mainVideos: VideoFile[] = [

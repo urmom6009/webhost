@@ -29,8 +29,6 @@ export function BrandHeader({ path }: { path: string }) {
   );
 }
 
-
-
 export function NavGroup({
   item,
   childrenItems,
@@ -58,8 +56,6 @@ export function NavGroup({
   );
 }
 
-
-
 export function NavButton({ item, active, nested = false }: { item: NavItem; active: boolean; nested?: boolean }) {
   return (
     <button className={`nav-link accent-${item.accent}${active ? " active" : ""}${nested ? " nested" : ""}`} onClick={() => navigateTo(item.href)}>
@@ -67,5 +63,3 @@ export function NavButton({ item, active, nested = false }: { item: NavItem; act
     </button>
   );
 }
-
-

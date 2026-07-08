@@ -51,12 +51,5 @@ export function App() {
     default:
       page = <NotFoundPage />;
   }
-
-  return (
-    <Shell path={path}>
-      {page}
-      <SpeedInsights />
-    </Shell>
-  );
-}
+};
 

@@ -7,10 +7,10 @@ export const aboutAccordions: AccordianItem[] = [
   },
   {
     title: "How you will buy the full files",
-    body: "Preview cards lead to external payment or delivery services. The site does not process cards or store payment data."
+    body: "Previews are available on X, the content linked on this site will redirect to Stripe to facilitate payment. Content will then be available to download. This website nor HH88Trance processes payments or store personal details or payment data."
   },
   {
-    title: "How you will commission a custom file",
+    title: "How to commission a custom trance:",
     body: "Use the contact links to describe style, vocal direction, theme, length, repetition preference, and budget. Approved commissions are handled off-site."
   }
 ];

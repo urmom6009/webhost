@@ -13,6 +13,7 @@ export type VideoFile = {
   meta: string[];
   price: string;
   duration?: string;
+  preview?: string;
   kind: "custom" | "main";
   visual: string;
   productSlug: string;

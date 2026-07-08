@@ -11,6 +11,6 @@ export const contactLinks: LinkItem[] = [
 export const socialLinks: LinkItem[] = [
   { label: "Main X account", href: "#pending-main-x", pending: true },
   { label: "Backup X account", href: "#pending-backup-x", pending: true },
-  { label: "Email for commissions", href: "mailto:commissions@example.com", pending: true }
+  { label: "Email for commissions", href: "HH88Trance@gmail.com", pending: true }
 ];
 

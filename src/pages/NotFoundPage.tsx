@@ -4,10 +4,10 @@ export function NotFoundPage() {
   return (
     <section className="page-shell centered-card-page">
       <div className="status-card">
-        <h1>Page Not Found</h1>
-        <p>The requested page is not part of the HH88TRANCE route set.</p>
+        <h1>404: Page Not Found</h1>
+        <p>The page requested can't be found.</p>
         <button className="primary-button" onClick={() => navigateTo("/")}>
-          Return Home
+          Get entranced.
         </button>
       </div>
     </section>

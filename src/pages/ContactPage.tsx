@@ -21,8 +21,6 @@ export function ContactPage() {
   );
 }
 
-
-
 function LinkSection({ title, links }: { title: string; links: LinkItem[] }) {
   return (
     <section className="link-section">
