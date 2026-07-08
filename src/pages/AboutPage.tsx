@@ -1,11 +1,14 @@
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { aboutAccordions } from "../content";
 
 export function AboutPage() {
   return (
     <section className="page-shell about-page">
-      <h1>HH88TRANCE</h1>
-      <p className="subhead">Findom | Hypno | Trance | ASMR | Music | Ritual | Devotion | Control</p>
+      <div className="section-hero compact">
+        <h1>HH88TRANCE</h1>
+        <p className="subhead">Findom | Hypno | Trance | ASMR | Music | Ritual | Devotion | Control</p>
+      </div>
       <div className="text-card">
         <p>
           HH88TRANCE is an adult hypnotic video and audio creator specializing in findom, hypno, trance, and ASMR files with dark,
@@ -34,7 +37,7 @@ function Accordion() {
         <div className="accordion-item" key={item.title}>
           <button onClick={() => setOpen(open === index ? -1 : index)} aria-expanded={open === index}>
             {item.title}
-            <span aria-hidden="true">⌄</span>
+            <ChevronDown size={24} aria-hidden="true" />
           </button>
           {open === index ? <p>{item.body}</p> : null}
         </div>
@@ -42,6 +45,4 @@ function Accordion() {
     </div>
   );
 }
-
-
 

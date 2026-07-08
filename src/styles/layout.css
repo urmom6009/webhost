@@ -20,44 +20,41 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(4, 4, 5, 0.96);
-  border-bottom: 1px solid rgba(184, 190, 196, 0.18);
+  padding: 0.45rem 0.75rem 0;
+  background: linear-gradient(180deg, rgba(4, 4, 5, 0.98), rgba(4, 4, 5, 0.92));
   backdrop-filter: blur(16px);
 }
 
-.money-banner {
-  position: relative;
-  display: flex;
+.header-frame {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: clamp(1rem, 4vw, 4rem);
   align-items: center;
-  justify-content: center;
-  width: 100%;
-  flex-direction: column;
-  gap: 0.2rem;
-  height: 86px;
-  overflow: hidden;
-  border: 0;
-  cursor: pointer;
+  width: min(100%, 1480px);
+  min-height: 68px;
+  margin: 0 auto;
+  padding: 0 1.4rem;
+  border: 1px solid rgba(184, 190, 196, 0.22);
+  border-bottom-color: rgba(184, 190, 196, 0.12);
   background:
-    linear-gradient(90deg, rgba(157, 16, 28, 0.3), transparent 34%, transparent 66%, rgba(157, 16, 28, 0.2)),
-    linear-gradient(180deg, rgba(184, 190, 196, 0.1), transparent 48%, rgba(0, 0, 0, 0.56)),
-    #090a0b;
+    linear-gradient(90deg, rgba(216, 27, 42, 0.09), transparent 34%),
+    rgba(5, 6, 7, 0.94);
 }
 
-.money-banner::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-block: 1px solid rgba(184, 190, 196, 0.18);
-  background:
-    linear-gradient(90deg, transparent 0 12%, rgba(184, 190, 196, 0.16) 12% 12.2%, transparent 12.2% 87.8%, rgba(184, 190, 196, 0.16) 87.8% 88%, transparent 88%),
-    repeating-linear-gradient(90deg, rgba(184, 190, 196, 0.07) 0 1px, transparent 1px 72px);
+.brand-home {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
 }
 
 .brand-mark {
-  position: relative;
-  z-index: 1;
   font-family: "Oswald", Impact, sans-serif;
-  font-size: clamp(2.35rem, 5.8vw, 4.25rem);
+  font-size: clamp(1.85rem, 4.2vw, 3rem);
   font-weight: 700;
   letter-spacing: 0;
   color: #f0eee8;
@@ -66,10 +63,8 @@
 }
 
 .brand-kicker {
-  position: relative;
-  z-index: 1;
   color: #aeb4ba;
-  font-size: clamp(0.62rem, 1.5vw, 0.78rem);
+  font-size: 0.66rem;
   font-weight: 800;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -78,10 +73,10 @@
 .main-nav {
   display: flex;
   align-items: flex-start;
-  justify-content: center;
+  justify-content: flex-end;
   gap: clamp(0.4rem, 1.6vw, 1.5rem);
-  min-height: 64px;
-  padding: 0.75rem 1.25rem 0.65rem;
+  min-height: 54px;
+  padding: 0;
   overflow-x: auto;
   scrollbar-color: rgba(255, 255, 255, 0.42) transparent;
 }
@@ -99,7 +94,7 @@
   align-items: center;
   gap: 0.35rem;
   max-width: 0;
-  padding: 0.45rem;
+  padding: 0.35rem;
   border: 1px solid rgba(184, 190, 196, 0.18);
   background: rgba(7, 8, 9, 0.98);
   opacity: 0;
@@ -126,7 +121,7 @@
 
 .nav-link {
   flex: 0 0 auto;
-  min-height: 40px;
+  min-height: 38px;
   padding: 0 0.85rem;
   border: 1px solid transparent;
   border-radius: 2px;

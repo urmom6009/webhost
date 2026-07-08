@@ -1,16 +1,17 @@
-import { BadgeDollarSign, ChevronLeft, FileLock2 } from "lucide-react";
+import { BadgeDollarSign, ChevronLeft, ChevronRight, FileLock2 } from "lucide-react";
 import { drainPlans, findomCards } from "../content";
 import { navigateTo } from "../app/routing";
 
 export function FindomLanding() {
   return (
     <section className="page-shell findom-landing">
-      <p className="capsule">Financial Domination</p>
-      <h1>Submit to the Process</h1>
-      <p className="lead">
-        Structured tribute systems, recurring drains, and contract status pages for adult financial devotion with clear boundaries and off-site
-        processing.
-      </p>
+      <div className="section-hero">
+        <h1>Submit to the Process</h1>
+        <p className="lead">
+          Structured tribute systems, recurring drains, and contract status pages for adult financial devotion with clear boundaries and
+          off-site processing.
+        </p>
+      </div>
       <div className="feature-grid">
         {findomCards.map(({ title, description, href, cta, Icon }) => (
           <article className="feature-card" key={title}>
@@ -20,7 +21,7 @@ export function FindomLanding() {
             <h2>{title}</h2>
             <p>{description}</p>
             <button className="primary-button small" onClick={() => navigateTo(href)}>
-              {cta} <span aria-hidden="true">→</span>
+              {cta} <ChevronRight size={18} />
             </button>
           </article>
         ))}
@@ -34,12 +35,14 @@ export function FindomLanding() {
 export function AutoDrainsPage() {
   return (
     <section className="page-shell drains-page">
-      <h1>
-        <span>Auto</span>
-        <BadgeDollarSign size={54} />
-        <em>Drains</em>
-      </h1>
-      <p className="drain-tagline">Automatic. Recurring. External.</p>
+      <div className="section-hero compact">
+        <h1>
+          <span>Auto</span>
+          <BadgeDollarSign size={54} />
+          <em>Drains</em>
+        </h1>
+        <p className="drain-tagline">Automatic. Recurring. External.</p>
+      </div>
       <div className="drain-list">
         {drainPlans.map((plan) => (
           <article className="drain-row" key={plan.name}>
@@ -78,6 +81,5 @@ export function ContractsPage() {
     </section>
   );
 }
-
 
 

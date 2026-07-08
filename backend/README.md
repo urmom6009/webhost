@@ -116,6 +116,8 @@ file-8
 
 Use the same slug in the admin portal or seed command for each active delivery file. The `/buy/<slug>` route intentionally returns `404` for missing, disabled, or invalid slugs so inactive products cannot be purchased from stale website links.
 
+The public website also polls `/catalog` for display-safe active product metadata. Only active products are returned. Delivery URLs, storage keys, provider file IDs, and private asset locations are intentionally excluded from that response.
+
 ## Admin Commands
 
 Set `ADMIN_TELEGRAM_IDS` to a comma-separated list of Telegram numeric user IDs.

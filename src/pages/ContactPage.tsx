@@ -4,8 +4,10 @@ import { contactLinks, socialLinks, type LinkItem } from "../content";
 export function ContactPage() {
   return (
     <section className="page-shell contact-page">
-      <h1>Links & Commissions</h1>
-      <p className="subhead">Pay & Send Links | Contact Links | Custom Video Commission Form</p>
+      <div className="section-hero compact">
+        <h1>Links & Commissions</h1>
+        <p className="subhead">Pay & Send Links | Contact Links | Custom Video Commission Form</p>
+      </div>
       <LinkSection title="Send Tribute Links" links={contactLinks} />
       <LinkSection title="Contact via DMs or Email" links={socialLinks} />
       <div className="text-card contact-note">
@@ -37,6 +39,5 @@ function LinkSection({ title, links }: { title: string; links: LinkItem[] }) {
     </section>
   );
 }
-
 
 
