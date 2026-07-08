@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { customVideos, drainPlans, findomCards, isValidProductSlug, mainVideos, navItems, productPurchaseUrl } from "../src/content";
 
+type MutableEnv = {
+  VITE_STOREFRONT_BASE_URL?: string;
+};
+
+const mutableEnv = import.meta.env as unknown as MutableEnv;
+
 describe("site content model", () => {
   it("covers the primary navigation routes", () => {
     expect(navItems.map((item) => item.href)).toEqual(["/", "/videos", "/findom", "/about", "/contact"]);
@@ -34,19 +40,19 @@ describe("site content model", () => {
 
     it("honors a storefront base URL override without trailing slash", () => {
       const originalBaseUrl = import.meta.env.VITE_STOREFRONT_BASE_URL;
-      (import.meta.env as any).VITE_STOREFRONT_BASE_URL = "https://override.example.com";
+      mutableEnv.VITE_STOREFRONT_BASE_URL = "https://override.example.com";
       expect(productPurchaseUrl("file-11")).toBe("https://override.example.com/buy/file-11");
-      (import.meta.env as any).VITE_STOREFRONT_BASE_URL = originalBaseUrl;
+      mutableEnv.VITE_STOREFRONT_BASE_URL = originalBaseUrl;
     });
 
     it("trims trailing slashes from storefront base URL override", () => {
       const originalBaseUrl = import.meta.env.VITE_STOREFRONT_BASE_URL;
 
-      (import.meta.env as any).VITE_STOREFRONT_BASE_URL = "https://override.example.com////";
+      mutableEnv.VITE_STOREFRONT_BASE_URL = "https://override.example.com////";
 
       expect(productPurchaseUrl("file-11")).toBe("https://override.example.com/buy/file-11");
 
-      (import.meta.env as any).VITE_STOREFRONT_BASE_URL = originalBaseUrl;
+      mutableEnv.VITE_STOREFRONT_BASE_URL = originalBaseUrl;
     });
   })
 

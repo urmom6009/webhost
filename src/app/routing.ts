@@ -4,6 +4,7 @@ import type { NavItem } from "../content";
 export const routeMap: Record<string, string> = {
   "/": "home",
   "/videos": "videos",
+  "/videos/custom": "customs",
   "/videos/customs": "customs",
   "/videos/main": "main",
   "/findom": "findom",
@@ -50,6 +51,5 @@ export function routeSection(path: string): NavItem["section"] {
   if (path === "/about" || path === "/contact" || path === "/privacy") return "about";
   return "home";
 }
-
 
 
