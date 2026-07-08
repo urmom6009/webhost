@@ -15,7 +15,7 @@ services:
     ports:
       - "${WEB_BIND:-127.0.0.1}:${WEB_HTTP_PORT:-8080}:8080"
     networks:
-      - frontend
+      - proxy
       - backend
     restart: unless-stopped
     security_opt:
@@ -195,8 +195,8 @@ services:
       - no-new-privileges:true
 
 networks:
-  frontend:
-    name: hh88trance-frontend
+  proxy:
+    external: true
   backend:
     name: hh88trance-backend
     internal: true
