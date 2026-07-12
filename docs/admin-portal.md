@@ -10,6 +10,8 @@ The portal requires `ADMIN_PORTAL_TOKEN`, sets a signed HTTP-only session cookie
 
 The production file browser is locked to `/mnt/storefront-media`. The API container mounts that host directory read-write, and the downloads container mounts the same directory read-only. Storage keys shown in the portal are relative to `/mnt/storefront-media`; paths outside that directory and symlinks are not browsable from the portal.
 
+Each file row can start a new draft product with the storage key prefilled. Save the product as a draft first, review the preview/edit screen, then enable **Active in catalog** when the title, price, delivery file, and Stripe checkout state are ready. Only active products appear in `/catalog` and Telegram `/catalog`.
+
 For local development and tests, the static React content editor is still available while Vite runs in development mode at:
 
 ```text

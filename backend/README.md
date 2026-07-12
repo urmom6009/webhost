@@ -158,10 +158,10 @@ All admin commands require authorization and write an audit event. `/debug_clear
 
 ## Admin Portal
 
-The HTTP admin portal is available at:
+The HTTP admin portal is available only through the admin host in production:
 
 ```text
-/admin
+https://admin.hh88trance.com/admin
 ```
 
 Set `ADMIN_PORTAL_TOKEN` in `.env` before exposing the app. The login form stores a signed HTTP-only session cookie. Keep this route behind the existing private/admin access boundary when possible.
@@ -172,6 +172,8 @@ The portal can:
 - upload a new file into `/mnt/storefront-media`
 - attach an existing server-side storage key under `/mnt/storefront-media`
 - visually browse server-side files under `/mnt/storefront-media`
+- create a draft video product directly from a file-browser row
+- preview and edit product title, slug, price, captions, delivery file, and live status before publishing
 - create or update the matching Stripe Product, Price, and Payment Link
 - automatically create the active `files` row for delivery
 - publish active products to `/catalog` and Telegram `/catalog`

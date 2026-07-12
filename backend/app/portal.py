@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import mimetypes
 import os
 import re
 import secrets
@@ -126,6 +127,18 @@ def safe_filename(filename: str) -> str:
     return name[:180]
 
 
+def title_from_storage_key(storage_key: str) -> str:
+    name = Path(storage_key).name
+    stem = Path(name).stem or name
+    cleaned = re.sub(r"[_-]+", " ", stem).strip()
+    return cleaned.title() or "New Video Product"
+
+
+def content_type_from_storage_key(storage_key: str) -> str:
+    guessed, _ = mimetypes.guess_type(storage_key)
+    return guessed or ""
+
+
 def content_type_for(upload: UploadFile | None, fallback: str | None) -> str | None:
     if fallback:
         return fallback.strip()
@@ -221,6 +234,18 @@ async def write_upload(upload: UploadFile, slug: str) -> str:
     return storage_key
 
 
+def form_value(value: str | int | None) -> str:
+    return escape("" if value is None else str(value), quote=True)
+
+
+def textarea_value(value: str | None) -> str:
+    return escape(value or "")
+
+
+def checked_attr(value: bool) -> str:
+    return " checked" if value else ""
+
+
 def page_shell(title: str, body: str, *, authenticated: bool, notice: str | None = None, active_nav: str = "content") -> HTMLResponse:
     escaped_title = escape(title)
     notice_html = f'<div class="notice">{escape(notice)}</div>' if notice else ""
@@ -302,6 +327,7 @@ def page_shell(title: str, body: str, *, authenticated: bool, notice: str | None
     .button.primary, button.primary {{ background: var(--accent); color: white; border-color: var(--accent); }}
     .button.primary:hover, button.primary:hover {{ background: var(--accent-dark); }}
     .button.danger {{ color: var(--danger); }}
+    .button[aria-disabled="true"] {{ color: var(--muted); pointer-events: none; background: #f2f4f7; }}
     form {{ margin: 0; }}
     .form-grid {{ display: grid; gap: 14px; }}
     label {{ display: grid; gap: 7px; font-size: 13px; font-weight: 700; color: #344054; }}
@@ -315,6 +341,11 @@ def page_shell(title: str, body: str, *, authenticated: bool, notice: str | None
     .error {{ background: #fef3f2; border: 1px solid #fecdca; color: var(--danger); }}
     .tile-preview {{ display: grid; grid-template-columns: 72px 1fr; gap: 13px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: #fbfdff; }}
     .thumb {{ display: grid; place-items: center; width: 72px; height: 72px; border-radius: 8px; background: #111827; color: white; font-weight: 800; text-align: center; font-size: 12px; }}
+    .preview-card {{ display: grid; gap: 14px; }}
+    .preview-hero {{ display: grid; grid-template-columns: 96px 1fr; gap: 16px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: #fbfdff; }}
+    .preview-thumb {{ display: grid; place-items: center; width: 96px; height: 96px; border-radius: 8px; background: #111827; color: white; font-weight: 900; text-align: center; }}
+    .preview-meta {{ display: flex; flex-wrap: wrap; gap: 8px; }}
+    .split-actions {{ display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }}
     .file-toolbar {{ display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin: 12px 0 16px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #fbfdff; }}
     .crumbs {{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 800; overflow-wrap: anywhere; }}
     .crumbs span {{ color: var(--muted); font-weight: 700; }}
@@ -393,6 +424,16 @@ async def product_rows(session: AsyncSession):
     return products, active_files, order_counts
 
 
+async def active_file_for_product(session: AsyncSession, product_id: uuid.UUID) -> ProductFile | None:
+    result = await session.execute(
+        select(ProductFile)
+        .where(ProductFile.product_id == product_id)
+        .where(ProductFile.active.is_(True))
+        .order_by(ProductFile.created_at.desc())
+    )
+    return result.scalars().first()
+
+
 def product_table(products: list[Product], active_files: dict[str, ProductFile], order_counts: dict) -> str:
     if not products:
         return '<div class="panel panel-pad"><h2>No content yet</h2><p>Upload a file and save a product to publish your first Telegram catalog item.</p></div>'
@@ -405,6 +446,7 @@ def product_table(products: list[Product], active_files: dict[str, ProductFile],
         buy_link = f"{settings().public_base_url.rstrip('/')}/buy/{quote(product.slug)}"
         stripe_link = product.stripe_payment_link_url or ""
         toggle_label = "Disable" if product.active else "Enable"
+        can_buy = product.active and file is not None
         rows.append(
             f"""
             <tr>
@@ -416,8 +458,9 @@ def product_table(products: list[Product], active_files: dict[str, ProductFile],
               <td>{escape(created)}</td>
               <td>
                 <div class="actions">
-                  <a class="button" href="{escape(buy_link)}" target="_blank" rel="noreferrer">Buy link</a>
+                  <a class="button" href="{escape(buy_link)}" target="_blank" rel="noreferrer" {'aria-disabled="true"' if not can_buy else ""}>Buy link</a>
                   {f'<a class="button" href="{escape(stripe_link)}" target="_blank" rel="noreferrer">Stripe link</a>' if stripe_link else ''}
+                  <a class="button" href="/admin/content/{product.id}">Preview / edit</a>
                   <form action="/admin/content/{product.id}/toggle" method="post"><button type="submit">{toggle_label}</button></form>
                 </div>
               </td>
@@ -434,24 +477,56 @@ def product_table(products: list[Product], active_files: dict[str, ProductFile],
     """
 
 
-def product_form() -> str:
-    return """
+def product_form(
+    *,
+    action: str = "/admin/content",
+    product: Product | None = None,
+    active_file: ProductFile | None = None,
+    storage_key: str = "",
+    title: str = "",
+    content_type: str = "",
+    active_default: bool = True,
+    submit_label: str = "Save Product",
+) -> str:
+    is_edit = product is not None
+    clean_storage_key = storage_key or ("" if is_edit else (active_file.storage_key if active_file else ""))
+    clean_title = product.title if product else title
+    clean_slug = product.slug if product else ""
+    clean_price = f"{Decimal(product.price_cents) / Decimal(100):.2f}" if product else ""
+    clean_currency = product.currency if product else "usd"
+    clean_description = product.description if product else ""
+    clean_caption = product.preview_caption if product else ""
+    clean_display_name = active_file.display_name if active_file else ""
+    clean_content_type = content_type or (active_file.content_type if active_file else "")
+    active_checked = product.active if product else active_default
+    heading = "Edit Product" if is_edit else "Upload / Add New Content"
+    help_text = (
+        "Review the preview, then enable Active in catalog when the product is ready to sell."
+        if is_edit
+        else "Leave Active unchecked to save a draft and preview it before it appears in the public catalog."
+    )
+    storage_help = (
+        f"Currently attached: {escape(active_file.storage_key)}"
+        if active_file
+        else "Use this when the file already exists under the delivery storage root."
+    )
+    return f"""
       <section class="panel panel-pad">
-        <h2>Upload / Add New Content</h2>
-        <form class="form-grid" action="/admin/content" method="post" enctype="multipart/form-data">
+        <h2>{escape(heading)}</h2>
+        <form class="form-grid" action="{escape(action)}" method="post" enctype="multipart/form-data">
           <label>Title
-            <input name="title" placeholder="Video Editing LUT Pack" required>
+            <input name="title" value="{form_value(clean_title)}" placeholder="Video Editing LUT Pack" required>
           </label>
           <label>Slug
-            <input name="slug" placeholder="video-editing-lut-pack">
+            <input name="slug" value="{form_value(clean_slug)}" placeholder="video-editing-lut-pack">
             <span class="help">Leave blank to generate from the title. Use letters, numbers, dashes, or underscores.</span>
           </label>
           <div class="two">
             <label>Price
-              <input name="price" inputmode="decimal" placeholder="15.00" required>
+              <input name="price" value="{form_value(clean_price)}" inputmode="decimal" placeholder="15.00" required>
             </label>
             <label>Currency
-              <input name="currency" value="usd" maxlength="8" required>
+              <input name="currency" value="{form_value(clean_currency)}" maxlength="8" required>
             </label>
           </div>
           <label>Upload file
@@ -459,32 +534,68 @@ def product_form() -> str:
             <span class="help">Uploads into the server storage root and makes it the active delivery file.</span>
           </label>
           <label>Or attach existing server file
-            <input name="storage_key" placeholder="my-product/original.mp4">
-            <span class="help">Use this when the file already exists under /mnt/storefront-media.</span>
+            <input name="storage_key" value="{form_value(clean_storage_key)}" placeholder="my-product/original.mp4">
+            <span class="help">{storage_help}</span>
           </label>
           <label>Download filename
-            <input name="display_name" placeholder="Video Editing LUT Pack.zip">
+            <input name="display_name" value="{form_value(clean_display_name)}" placeholder="Video Editing LUT Pack.mp4">
           </label>
           <label>Content type
-            <input name="content_type" placeholder="video/mp4">
+            <input name="content_type" value="{form_value(clean_content_type)}" placeholder="video/mp4">
           </label>
           <label>Description
-            <textarea name="description" placeholder="Short buyer-facing description."></textarea>
+            <textarea name="description" placeholder="Short buyer-facing description.">{textarea_value(clean_description)}</textarea>
           </label>
           <label>Preview caption
-            <textarea name="preview_caption" placeholder="Caption text for Telegram preview posts."></textarea>
+            <textarea name="preview_caption" placeholder="Caption text for Telegram preview posts.">{textarea_value(clean_caption)}</textarea>
           </label>
-          <label class="check-row"><input type="checkbox" name="active" value="yes" checked> Active in catalog</label>
+          <label class="check-row"><input type="checkbox" name="active" value="yes"{checked_attr(active_checked)}> Active in catalog</label>
           <p class="help">Saving creates or updates the matching Stripe Product, Price, and Payment Link. Price changes create a new Stripe Price.</p>
           <div class="tile-preview">
             <div class="thumb">NEW<br>TILE</div>
             <div>
-              <strong>Generated catalog item</strong>
-              <div class="slug">The saved active product appears in Telegram /catalog.</div>
+              <strong>{escape(clean_title or "Generated catalog item")}</strong>
+              <div class="slug">{escape(help_text)}</div>
             </div>
           </div>
-          <button class="primary" type="submit">Save Product</button>
+          <button class="primary" type="submit">{escape(submit_label)}</button>
         </form>
+      </section>
+    """
+
+
+def product_preview(product: Product, active_file: ProductFile | None) -> str:
+    buy_link = f"{settings().public_base_url.rstrip('/')}/buy/{quote(product.slug)}"
+    stripe_link = product.stripe_payment_link_url or ""
+    file_label = active_file.storage_key if active_file else "No active delivery file"
+    can_buy = product.active and active_file is not None
+    return f"""
+      <section class="panel panel-pad preview-card">
+        <div class="preview-hero">
+          <div class="preview-thumb">VIDEO<br>FILE</div>
+          <div>
+            <h2>{escape(product.title)}</h2>
+            <p>{escape(product.description or "No description set.")}</p>
+            <div class="preview-meta">
+              <span class="badge {'active' if product.active else 'inactive'}">{'Live in catalog' if product.active else 'Draft preview'}</span>
+              <span class="badge">{escape(money(product.price_cents, product.currency))}</span>
+              <span class="badge">{escape(product.slug)}</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <strong>Delivery file</strong>
+          <div class="slug">{escape(file_label)}</div>
+        </div>
+        <div>
+          <strong>Telegram preview caption</strong>
+          <p>{escape(product.preview_caption or "No preview caption set.")}</p>
+        </div>
+        <div class="split-actions">
+          <a class="button" href="{escape(buy_link)}" target="_blank" rel="noreferrer" {'aria-disabled="true"' if not can_buy else ""}>Test buy link</a>
+          {f'<a class="button" href="{escape(stripe_link)}" target="_blank" rel="noreferrer">Stripe payment link</a>' if stripe_link else ''}
+          <a class="button" href="/admin/files">Attach another server file</a>
+        </div>
       </section>
     """
 
@@ -584,7 +695,10 @@ def file_browser(prefix: str, current_path: Path) -> str:
                 <div class="slug">Storage key: <code>{escape(child_prefix)}</code></div>
                 <div class="file-meta"><span>Modified {escape(format_mtime(child_stat.st_mtime))}</span></div>
               </div>
-              <div class="muted">{escape(format_bytes(child_stat.st_size))}</div>
+              <div class="actions">
+                <span class="muted">{escape(format_bytes(child_stat.st_size))}</span>
+                <a class="button" href="/admin/content/new?storage_key={quote(child_prefix)}">Create product</a>
+              </div>
             </div>
             """
         )
@@ -649,6 +763,7 @@ async def save_product_from_form(
     storage_key: str | None,
     display_name: str | None,
     content_type: str | None,
+    product: Product | None = None,
 ) -> Product:
     clean_title = title.strip()
     if not clean_title:
@@ -656,23 +771,35 @@ async def save_product_from_form(
     clean_slug = (slug or slug_from_title(clean_title)).strip()
     if not valid_deeplink_payload(clean_slug):
         raise ValueError("slug may only contain letters, numbers, underscore, and dash")
-    existing = await session.execute(select(Product).where(Product.slug == clean_slug))
-    if existing.scalar_one_or_none() is not None:
+    existing = (await session.execute(select(Product).where(Product.slug == clean_slug))).scalar_one_or_none()
+    if existing is not None and (product is None or existing.id != product.id):
         raise ValueError("product slug already exists")
 
-    product = Product(
-        slug=clean_slug,
-        title=clean_title,
-        description=(description or "").strip() or None,
-        price_cents=parse_price_cents(price),
-        currency=currency.strip().lower() or "usd",
-        preview_caption=(preview_caption or "").strip() or None,
-        storage_provider="static_onedrive",
-        onedrive_url="https://example.invalid/local-file",
-        active=active == "yes",
-    )
-    session.add(product)
-    await session.flush()
+    if product is None:
+        product = Product(
+            slug=clean_slug,
+            title=clean_title,
+            description=(description or "").strip() or None,
+            price_cents=parse_price_cents(price),
+            currency=currency.strip().lower() or "usd",
+            preview_caption=(preview_caption or "").strip() or None,
+            storage_provider="static_onedrive",
+            onedrive_url="https://example.invalid/local-file",
+            active=active == "yes",
+        )
+        session.add(product)
+        await session.flush()
+        action = "portal_product_created"
+    else:
+        product.slug = clean_slug
+        product.title = clean_title
+        product.description = (description or "").strip() or None
+        product.price_cents = parse_price_cents(price)
+        product.currency = currency.strip().lower() or "usd"
+        product.preview_caption = (preview_caption or "").strip() or None
+        product.active = active == "yes"
+        product.updated_at = utcnow()
+        action = "portal_product_updated"
 
     attached_key = None
     upload_has_file = upload is not None and bool(upload.filename)
@@ -680,7 +807,7 @@ async def save_product_from_form(
         attached_key = await write_upload(upload, product.slug)
     elif storage_key:
         attached_key = safe_storage_key(storage_key)
-    elif product.active:
+    elif product.active and await active_file_for_product(session, product.id) is None:
         raise ValueError("active products need an uploaded file or existing storage key")
 
     if attached_key:
@@ -695,7 +822,7 @@ async def save_product_from_form(
         product.updated_at = utcnow()
         await create_audit(
             session,
-            "portal_product_created",
+            action,
             target_type="product",
             target_id=str(product.id),
             metadata={"slug": product.slug, "storage_key": file.storage_key},
@@ -703,7 +830,7 @@ async def save_product_from_form(
     else:
         await create_audit(
             session,
-            "portal_product_created",
+            action,
             target_type="product",
             target_id=str(product.id),
             metadata={"slug": product.slug, "storage_key": None},
@@ -770,10 +897,57 @@ async def admin_content(request: Request, notice: str | None = None) -> Response
       </div>
       <div class="content-grid">
         {product_table(products, active_files, order_counts)}
-        {product_form()}
+        {product_form(active_default=False)}
       </div>
     """
     return page_shell("Store Admin Content", body, authenticated=True, notice=notice)
+
+
+@router.get("/admin/content/new", response_class=HTMLResponse)
+async def admin_content_new(
+    request: Request,
+    storage_key: str | None = None,
+    notice: str | None = None,
+) -> Response:
+    if not is_admin_request(request):
+        return admin_redirect()
+    safe_key = ""
+    title = ""
+    content_type = ""
+    if storage_key:
+        try:
+            safe_key = safe_storage_key(storage_key)
+            path = local_file_path(safe_key)
+            if not path.is_file():
+                raise ValueError("selected storage key is not a file")
+            title = title_from_storage_key(safe_key)
+            content_type = content_type_from_storage_key(safe_key)
+        except Exception as exc:
+            return await admin_content(request, notice=f"Could not use selected file: {exc}")
+    body = f"""
+      <div class="topbar">
+        <div>
+          <h1>New Product</h1>
+          <p>Create a draft from a server file, preview it, then publish when the product is ready.</p>
+        </div>
+        <a class="button" href="/admin/files">Browse Files</a>
+      </div>
+      <div class="content-grid">
+        {product_form(storage_key=safe_key, title=title, content_type=content_type, active_default=False)}
+        <section class="panel panel-pad preview-card">
+          <h2>Draft preview</h2>
+          <p>The saved product remains hidden until Active in catalog is checked. This lets you verify title, price, delivery file, and checkout wiring before buyers can purchase it.</p>
+          <div class="preview-hero">
+            <div class="preview-thumb">VIDEO<br>FILE</div>
+            <div>
+              <strong>{escape(title or "Selected video product")}</strong>
+              <div class="slug">{escape(safe_key or "Choose a file from the explorer or upload one here.")}</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    """
+    return page_shell("New Product", body, authenticated=True, notice=notice)
 
 
 @router.get("/admin/files", response_class=HTMLResponse)
@@ -844,6 +1018,86 @@ async def admin_content_create(
             await session.commit()
             return await admin_content(request, notice=f"Could not save product: {exc}")
     return RedirectResponse(f"/admin/content?notice=Saved+{quote(product.slug)}", status_code=303)
+
+
+@router.get("/admin/content/{product_id}", response_class=HTMLResponse)
+async def admin_content_edit(request: Request, product_id: str, notice: str | None = None) -> Response:
+    if not is_admin_request(request):
+        return admin_redirect()
+    try:
+        product_uuid = uuid.UUID(product_id)
+    except ValueError:
+        return await admin_content(request, notice="Product not found.")
+    async with SessionLocal() as session:
+        product = await session.get(Product, product_uuid)
+        if product is None:
+            return await admin_content(request, notice="Product not found.")
+        active_file = await active_file_for_product(session, product.id)
+        body = f"""
+          <div class="topbar">
+            <div>
+              <h1>Preview / Edit</h1>
+              <p>Review the exact product state before making it live in the public catalog.</p>
+            </div>
+            <a class="button" href="/admin/content">All Content</a>
+          </div>
+          <div class="content-grid">
+            {product_form(action=f"/admin/content/{product.id}", product=product, active_file=active_file, submit_label="Save Changes")}
+            {product_preview(product, active_file)}
+          </div>
+        """
+    return page_shell("Preview Product", body, authenticated=True, notice=notice)
+
+
+@router.post("/admin/content/{product_id}")
+async def admin_content_update(
+    request: Request,
+    product_id: str,
+    title: Annotated[str, Form(...)],
+    price: Annotated[str, Form(...)],
+    currency: Annotated[str, Form(...)],
+    slug: Annotated[str, Form()] = "",
+    description: Annotated[str, Form()] = "",
+    preview_caption: Annotated[str, Form()] = "",
+    active: Annotated[str | None, Form()] = None,
+    storage_key: Annotated[str, Form()] = "",
+    display_name: Annotated[str, Form()] = "",
+    content_type: Annotated[str, Form()] = "",
+    upload: Annotated[UploadFile | None, UploadFormFile()] = None,
+) -> Response:
+    if not is_admin_request(request):
+        return admin_redirect()
+    try:
+        product_uuid = uuid.UUID(product_id)
+    except ValueError:
+        return await admin_content(request, notice="Product not found.")
+    async with SessionLocal() as session:
+        product = await session.get(Product, product_uuid)
+        if product is None:
+            return await admin_content(request, notice="Product not found.")
+        try:
+            saved = await save_product_from_form(
+                session,
+                title=title,
+                slug=slug,
+                price=price,
+                currency=currency,
+                description=description,
+                preview_caption=preview_caption,
+                active=active,
+                upload=upload,
+                storage_key=storage_key,
+                display_name=display_name,
+                content_type=content_type,
+                product=product,
+            )
+            await session.commit()
+        except Exception as exc:
+            await session.rollback()
+            await create_audit(session, "portal_product_updated", success=False, target_type="product", target_id=product_id, reason=str(exc))
+            await session.commit()
+            return await admin_content_edit(request, product_id, notice=f"Could not save product: {exc}")
+    return RedirectResponse(f"/admin/content/{saved.id}?notice=Saved+{quote(saved.slug)}", status_code=303)
 
 
 @router.post("/admin/content/{product_id}/toggle")
