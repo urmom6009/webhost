@@ -21,7 +21,7 @@ describe("App routing and interactions", () => {
     render(<App />);
 
     expect(
-      screen.getByRole("link", { name: /buy file 11 through telegram and stripe/i })
+      screen.getByRole("link", { name: /buy file 11 with stripe/i })
     ).toHaveAttribute("href", "https://serve.hh88trance.com/buy/file-11");
   });
 
@@ -30,8 +30,8 @@ describe("App routing and interactions", () => {
     render(<App />);
 
     expect(
-      screen.getByRole("link", { name: /buy custom 4 - mtx through telegram and stripe/i })
-    ).toHaveAttribute("href", "https://serve.hh88trance.com/buy/custom-4-mtx");
+      screen.getByRole("link", { name: /buy undergoing maintenance with stripe/i })
+    ).toHaveAttribute("href", "https://serve.hh88trance.com/buy/under-construction");
   });
 
   it("uses configurable storefront base URL for website purchasing links", () => {
@@ -43,7 +43,7 @@ describe("App routing and interactions", () => {
       render(<App />);
 
       expect(
-        screen.getByRole("link", { name: /buy file 11 through telegram and stripe/i })
+        screen.getByRole("link", { name: /buy file 11 with stripe/i })
       ).toHaveAttribute("href", "https://store.example.com/buy/file-11");
     } finally {
       import.meta.env.VITE_STOREFRONT_BASE_URL = originalBaseUrl;
@@ -55,7 +55,7 @@ describe("App routing and interactions", () => {
     render(<App />);
     const trigger = screen.getByRole("button", { name: /how you will buy the full files/i });
     fireEvent.click(trigger);
-    expect(screen.getByText(/external payment or delivery services/i)).toBeInTheDocument();
+    expect(screen.getByText(/redirect to Stripe to facilitate payment/i)).toBeInTheDocument();
   });
 
   it("shows the age gate when local approval is absent", () => {

@@ -5,7 +5,7 @@ Secure Telegram storefront service for digital video delivery.
 The phase 1 flow is:
 
 ```text
-website /buy/<slug> or telegram preview caption -> bot deep link -> product lookup -> stripe checkout
+website /buy/<slug> or telegram preview caption -> backend product lookup -> stripe checkout
 -> verified stripe webhook -> database access grant -> gated delivery token
 -> temporary redirect to static OneDrive URL
 ```
@@ -169,11 +169,12 @@ Set `ADMIN_PORTAL_TOKEN` in `.env` before exposing the app. The login form store
 The portal can:
 
 - create a product from a title, slug, price, description, preview caption, and active/draft state
-- upload a new file into `DOWNLOAD_STORAGE_ROOT`
-- attach an existing server-side storage key under `DOWNLOAD_STORAGE_ROOT`
-- visually browse server-side files under `DOWNLOAD_STORAGE_ROOT`
+- upload a new file into `/mnt/storefront-media`
+- attach an existing server-side storage key under `/mnt/storefront-media`
+- visually browse server-side files under `/mnt/storefront-media`
+- create or update the matching Stripe Product, Price, and Payment Link
 - automatically create the active `files` row for delivery
-- publish active products to Telegram `/catalog`
+- publish active products to `/catalog` and Telegram `/catalog`
 - enable or disable products without deleting historical orders
 
 Active products require either an uploaded file or an existing storage key, so a purchasable tile cannot be saved without a delivery target.

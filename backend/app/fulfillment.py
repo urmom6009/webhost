@@ -27,6 +27,7 @@ async def fulfill_paid_order(
         select(Order)
         .options(
             selectinload(Order.user),
+            selectinload(Order.buyer),
             selectinload(Order.product),
             selectinload(Order.access_grants),
         )
@@ -57,8 +58,11 @@ async def fulfill_paid_order(
 
     grant = next((grant for grant in order.access_grants if grant.status == "active"), None)
     if grant is None:
+        if order.user_id is None and order.buyer_id is None:
+            return FulfillmentResult(False, None, "order_missing_owner")
         grant = AccessGrant(
             user_id=order.user_id,
+            buyer_id=order.buyer_id,
             product_id=order.product_id,
             order_id=order.id,
             status="active",

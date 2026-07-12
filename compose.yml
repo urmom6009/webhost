@@ -37,11 +37,11 @@ services:
       - .env
     environment:
       DATABASE_URL: "postgresql+asyncpg://storefront:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/storefront"
-      DOWNLOAD_STORAGE_ROOT: /srv/storefront-media/products
+      DOWNLOAD_STORAGE_ROOT: /mnt/storefront-media
       DOWNLOAD_PUBLIC_PREFIX: /download-file
       AUTO_MIGRATE: "false"
     volumes:
-      - storefront_media:/srv/storefront-media/products:rw
+      - /mnt/storefront-media:/mnt/storefront-media:rw
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -64,7 +64,7 @@ services:
       - .env
     environment:
       DATABASE_URL: "postgresql+asyncpg://storefront:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/storefront"
-      DOWNLOAD_STORAGE_ROOT: /srv/storefront-media/products
+      DOWNLOAD_STORAGE_ROOT: /mnt/storefront-media
       DOWNLOAD_PUBLIC_PREFIX: /download-file
       AUTO_MIGRATE: "false"
     command: ["alembic", "upgrade", "head"]
@@ -72,7 +72,7 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - storefront_media:/srv/storefront-media/products:rw
+      - /mnt/storefront-media:/mnt/storefront-media:rw
     networks:
       - backend
     restart: "no"
@@ -112,7 +112,7 @@ services:
       DOWNLOAD_URL_SECRET: "${DOWNLOAD_URL_SECRET:?set DOWNLOAD_URL_SECRET in .env}"
     volumes:
       - ./backend/deploy/nginx.downloads.conf.template:/etc/nginx/templates/default.conf.template:ro
-      - storefront_media:/srv/storefront-media/products:ro
+      - /mnt/storefront-media:/mnt/storefront-media:ro
     expose:
       - "8080"
     networks:
@@ -206,8 +206,6 @@ networks:
 volumes:
   postgres_data:
     name: hh88trance-postgres-data
-  storefront_media:
-    name: hh88trance-storefront-media
   prometheus_data:
     name: hh88trance-prometheus-data
   grafana_data:

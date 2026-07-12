@@ -25,6 +25,7 @@ async def test_admin_session_cookie_round_trips(monkeypatch):
 @pytest.mark.asyncio
 async def test_portal_create_product_uploads_file_and_attaches_it(session, tmp_path, monkeypatch):
     monkeypatch.setenv("DOWNLOAD_STORAGE_ROOT", str(tmp_path))
+    monkeypatch.setattr(portal, "sync_product_to_stripe", lambda product: None)
     get_settings.cache_clear()
     upload = UploadFile(file=io.BytesIO(b"zip-bytes"), filename="../Video Pack.zip")
 
@@ -97,4 +98,25 @@ def test_file_browser_lists_storage_keys_and_blocks_escape(tmp_path, monkeypatch
     assert "pack/video.mp4" in html
     with pytest.raises(ValueError):
         portal.resolve_storage_prefix("../etc")
+    get_settings.cache_clear()
+
+
+def test_file_browser_blocks_symlinks_without_following_them(tmp_path, monkeypatch):
+    root = tmp_path / "media"
+    outside = tmp_path / "outside"
+    root.mkdir()
+    outside.mkdir()
+    (outside / "private.txt").write_text("outside root")
+    (root / "escape").symlink_to(outside, target_is_directory=True)
+
+    monkeypatch.setenv("DOWNLOAD_STORAGE_ROOT", str(root))
+    get_settings.cache_clear()
+
+    prefix, path = portal.resolve_storage_prefix(None)
+    html = portal.file_browser(prefix, path)
+
+    assert "Symlink blocked" in html
+    assert "private.txt" not in html
+    with pytest.raises(ValueError):
+        portal.resolve_storage_prefix("escape")
     get_settings.cache_clear()

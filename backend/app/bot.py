@@ -204,8 +204,8 @@ async def send_product_checkout(message: Message, session: AsyncSession, user: U
 
     checkout = create_checkout_session(
         order=order,
-        user=user,
         product=product,
+        user=user,
     )
 
     payment.provider_session_id = checkout.id

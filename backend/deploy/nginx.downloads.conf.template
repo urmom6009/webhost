@@ -3,7 +3,7 @@ server {
   server_name _;
 
   location /download-file/ {
-    alias /srv/storefront-media/products/;
+    alias /mnt/storefront-media/;
 
     secure_link $arg_sig,$arg_expires;
     secure_link_md5 "$secure_link_expires$uri ${DOWNLOAD_URL_SECRET}";

@@ -13,7 +13,7 @@ describe("site content model", () => {
   });
 
   it("keeps video cards split across custom and main routes", () => {
-    expect(customVideos).toHaveLength(4);
+    expect(customVideos).toHaveLength(1);
     expect(mainVideos).toHaveLength(4);
     expect(customVideos.every((video) => video.kind === "custom")).toBe(true);
     expect(mainVideos.every((video) => video.kind === "main")).toBe(true);

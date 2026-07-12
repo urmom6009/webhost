@@ -45,7 +45,7 @@ class Settings(BaseSettings):
 
     delivery_token_ttl_minutes: int = Field(60, alias="DELIVERY_TOKEN_TTL_MINUTES")
     delivery_token_max_uses: int = Field(3, alias="DELIVERY_TOKEN_MAX_USES")
-    download_storage_root: str = Field("/srv/storefront-media/products", alias="DOWNLOAD_STORAGE_ROOT")
+    download_storage_root: str = Field("/mnt/storefront-media", alias="DOWNLOAD_STORAGE_ROOT")
     download_public_prefix: str = Field("/download-file", alias="DOWNLOAD_PUBLIC_PREFIX")
     download_url_secret: str = Field("storefront-download-secret", alias="DOWNLOAD_URL_SECRET")
     download_url_ttl_seconds: int = Field(1800, alias="DOWNLOAD_URL_TTL_SECONDS")

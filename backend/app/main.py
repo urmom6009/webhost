@@ -2,6 +2,7 @@ import uuid
 import time
 from collections import Counter
 from contextlib import asynccontextmanager
+from html import escape
 
 import stripe
 from aiogram.types import Update
@@ -16,11 +17,11 @@ from app.bot import bot, configure_command_menu, dp
 from app.config import get_settings
 from app.db import SessionLocal, init_db
 from app.fulfillment import build_delivery_url, fulfill_paid_order
-from app.models import Order, Payment, Product, ProviderEvent
+from app.models import AccessGrant, Buyer, Order, Payment, Product, ProviderEvent, utcnow
 from app.portal import router as portal_router
-from app.security import telegram_bot_deeplink, valid_deeplink_payload
+from app.security import valid_deeplink_payload
 from app.services.delivery import redeem_delivery_token
-from app.services.stripe_service import configure_stripe
+from app.services.stripe_service import configure_stripe, create_checkout_session
 
 settings = get_settings()
 REQUEST_TOTAL: Counter[tuple[str, str, str]] = Counter()
@@ -166,6 +167,133 @@ async def catalog() -> dict:
     }
 
 
+def checkout_customer_details(checkout_session) -> dict:
+    details = checkout_session.get("customer_details") or {}
+    if not isinstance(details, dict):
+        return {}
+    return details
+
+
+async def upsert_buyer_from_checkout(session, checkout_session, fallback_buyer: Buyer | None = None) -> Buyer:
+    details = checkout_customer_details(checkout_session)
+    customer_id = checkout_session.get("customer")
+    email = details.get("email")
+    name = details.get("name")
+
+    buyer = fallback_buyer
+    if buyer is None and customer_id:
+        result = await session.execute(select(Buyer).where(Buyer.stripe_customer_id == customer_id))
+        buyer = result.scalar_one_or_none()
+    if buyer is None and email:
+        result = await session.execute(select(Buyer).where(Buyer.email == email).order_by(Buyer.first_seen_at.desc()))
+        buyer = result.scalars().first()
+    if buyer is None:
+        buyer = Buyer(first_seen_at=utcnow(), last_seen_at=utcnow())
+        session.add(buyer)
+
+    buyer.email = email or buyer.email
+    buyer.name = name or buyer.name
+    buyer.stripe_customer_id = customer_id or buyer.stripe_customer_id
+    buyer.last_seen_at = utcnow()
+    await session.flush()
+    return buyer
+
+
+async def resolve_product_from_checkout(session, checkout_session, metadata: dict) -> Product | None:
+    product_id_raw = metadata.get("product_id")
+    if product_id_raw:
+        try:
+            product_id = uuid.UUID(product_id_raw)
+        except ValueError:
+            product_id = None
+        if product_id is not None:
+            result = await session.execute(select(Product).where(Product.id == product_id))
+            product = result.scalar_one_or_none()
+            if product is not None:
+                return product
+
+    product_slug = metadata.get("product_slug")
+    if product_slug:
+        result = await session.execute(select(Product).where(Product.slug == product_slug))
+        product = result.scalar_one_or_none()
+        if product is not None:
+            return product
+
+    payment_link_id = checkout_session.get("payment_link")
+    if payment_link_id:
+        result = await session.execute(select(Product).where(Product.stripe_payment_link_id == payment_link_id))
+        return result.scalar_one_or_none()
+
+    return None
+
+
+async def ensure_order_for_checkout(session, checkout_session, metadata: dict) -> Order:
+    order_id_raw = checkout_session.get("client_reference_id") or metadata.get("order_id")
+    if order_id_raw:
+        try:
+            order_id = uuid.UUID(order_id_raw)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="invalid order_id metadata")
+
+        result = await session.execute(
+            select(Order)
+            .options(
+                selectinload(Order.user),
+                selectinload(Order.buyer),
+                selectinload(Order.product),
+                selectinload(Order.payments),
+                selectinload(Order.access_grants),
+            )
+            .where(Order.id == order_id)
+        )
+        order = result.scalar_one_or_none()
+        if order is None:
+            raise HTTPException(status_code=404, detail="order not found")
+        if order.buyer_id is not None:
+            order.buyer = await upsert_buyer_from_checkout(session, checkout_session, order.buyer)
+        return order
+
+    product = await resolve_product_from_checkout(session, checkout_session, metadata)
+    if product is None:
+        raise HTTPException(status_code=400, detail="checkout session missing order_id or product metadata")
+
+    buyer = await upsert_buyer_from_checkout(session, checkout_session)
+    order = Order(
+        buyer_id=buyer.id,
+        product_id=product.id,
+        status="pending",
+        amount_cents=product.price_cents,
+        currency=product.currency,
+    )
+    session.add(order)
+    await session.flush()
+
+    payment = Payment(
+        order_id=order.id,
+        buyer_id=buyer.id,
+        provider="stripe",
+        provider_session_id=checkout_session.get("id"),
+        status="pending",
+        amount_minor=order.amount_cents,
+        currency=order.currency,
+    )
+    session.add(payment)
+    await session.flush()
+
+    result = await session.execute(
+        select(Order)
+        .options(
+            selectinload(Order.user),
+            selectinload(Order.buyer),
+            selectinload(Order.product),
+            selectinload(Order.payments),
+            selectinload(Order.access_grants),
+        )
+        .where(Order.id == order.id)
+    )
+    return result.scalar_one()
+
+
 @app.post(settings.telegram_webhook_path)
 async def telegram_webhook(
     request: Request,
@@ -260,53 +388,57 @@ async def product_purchase_redirect(product_slug: str) -> RedirectResponse:
         raise HTTPException(status_code=404, detail="product not found")
 
     async with SessionLocal() as session:
-        result = await session.execute(
-            select(Product)
-            .where(Product.slug == product_slug)
-            .where(Product.active.is_(True))
-        )
-        product = result.scalar_one_or_none()
+        try:
+            result = await session.execute(
+                select(Product)
+                .where(Product.slug == product_slug)
+                .where(Product.active.is_(True))
+            )
+            product = result.scalar_one_or_none()
+            if product is None:
+                raise HTTPException(status_code=404, detail="product not found")
 
-    if product is None:
-        raise HTTPException(status_code=404, detail="product not found")
+            buyer = Buyer(first_seen_at=utcnow(), last_seen_at=utcnow())
+            session.add(buyer)
+            await session.flush()
 
-    try:
-        target = telegram_bot_deeplink(settings.telegram_bot_username, product.slug)
-    except ValueError:
-        raise HTTPException(status_code=503, detail="telegram bot username is not configured")
+            order = Order(
+                buyer_id=buyer.id,
+                product_id=product.id,
+                status="pending",
+                amount_cents=product.price_cents,
+                currency=product.currency,
+            )
+            session.add(order)
+            await session.flush()
 
-    return RedirectResponse(target, status_code=302)
+            payment = Payment(
+                order_id=order.id,
+                buyer_id=buyer.id,
+                provider="stripe",
+                status="pending",
+                amount_minor=order.amount_cents,
+                currency=order.currency,
+            )
+            session.add(payment)
+            await session.flush()
+
+            checkout = create_checkout_session(order=order, buyer=buyer, product=product)
+            payment.provider_session_id = checkout.id
+            await session.commit()
+        except HTTPException:
+            await session.rollback()
+            raise
+        except Exception:
+            await session.rollback()
+            raise HTTPException(status_code=502, detail="could not create checkout session")
+
+    return RedirectResponse(checkout.url, status_code=303)
 
 
 async def handle_checkout_session_completed(session, checkout_session) -> dict | None:
     metadata = dict(checkout_session.get("metadata") or {})
-    order_id_raw = checkout_session.get("client_reference_id") or metadata.get("order_id")
-
-    if not order_id_raw:
-        raise HTTPException(
-            status_code=400,
-            detail="checkout session missing order_id metadata",
-        )
-
-    try:
-        order_id = uuid.UUID(order_id_raw)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="invalid order_id metadata")
-
-    result = await session.execute(
-        select(Order)
-        .options(
-            selectinload(Order.user),
-            selectinload(Order.product),
-            selectinload(Order.payments),
-        )
-        .where(Order.id == order_id)
-    )
-
-    order = result.scalar_one_or_none()
-
-    if order is None:
-        raise HTTPException(status_code=404, detail="order not found")
+    order = await ensure_order_for_checkout(session, checkout_session, metadata)
 
     if checkout_session.get("payment_status") != "paid":
         return None
@@ -322,7 +454,18 @@ async def handle_checkout_session_completed(session, checkout_session) -> dict |
     )
 
     if payment is None:
-        raise HTTPException(status_code=404, detail="payment not found")
+        payment = Payment(
+            order_id=order.id,
+            user_id=order.user_id,
+            buyer_id=order.buyer_id,
+            provider="stripe",
+            provider_session_id=checkout_session.get("id"),
+            status="pending",
+            amount_minor=order.amount_cents,
+            currency=order.currency,
+        )
+        session.add(payment)
+        await session.flush()
 
     payment.provider_payment_id = checkout_session.get("payment_intent")
     payment.raw_amount_minor = checkout_session.get("amount_total")
@@ -335,6 +478,9 @@ async def handle_checkout_session_completed(session, checkout_session) -> dict |
 
     result = await fulfill_paid_order(session, order.id, payment.id, "stripe")
     if not result.fulfilled or result.delivery_token is None:
+        return None
+
+    if order.user is None or order.user.telegram_id is None:
         return None
 
     delivery_url = await build_delivery_url(result.delivery_token)
@@ -360,14 +506,53 @@ async def delivery(raw_token: str) -> RedirectResponse:
     return RedirectResponse(target.url, status_code=302)
 
 
+async def delivery_url_for_checkout_session(session_id: str) -> str | None:
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(Payment)
+            .options(
+                selectinload(Payment.order)
+                .selectinload(Order.access_grants)
+                .selectinload(AccessGrant.delivery_tokens)
+            )
+            .where(Payment.provider == "stripe")
+            .where(Payment.provider_session_id == session_id)
+        )
+        payment = result.scalar_one_or_none()
+        if payment is None or payment.order.fulfilled_at is None:
+            return None
+        grant = next((grant for grant in payment.order.access_grants if grant.status == "active"), None)
+        if grant is None:
+            return None
+        from app.services.delivery import create_delivery_token
+
+        raw_token = await create_delivery_token(session, grant)
+        await session.commit()
+        return await build_delivery_url(raw_token)
+
+
 @app.get("/success")
-async def success() -> HTMLResponse:
-    return HTMLResponse(
+async def success(session_id: str | None = None) -> HTMLResponse:
+    delivery_link = None
+    if session_id:
+        delivery_link = await delivery_url_for_checkout_session(session_id)
+    if delivery_link:
+        body = f"""
+            <h1>payment confirmed</h1>
+            <p>Your access link is ready.</p>
+            <p><a href="{escape(delivery_link)}">Download your content</a></p>
+            <p>Keep this link private.</p>
         """
+    else:
+        body = """
+            <h1>payment received</h1>
+            <p>Your payment is being confirmed by Stripe. Refresh this page in a moment if the access link is not visible yet.</p>
+        """
+    return HTMLResponse(
+        f"""
         <html>
           <body style="font-family: system-ui; max-width: 640px; margin: 4rem auto;">
-            <h1>payment received</h1>
-            <p>you can return to telegram. the bot will send the delivery link once the webhook confirms.</p>
+            {body}
           </body>
         </html>
         """

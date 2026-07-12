@@ -39,6 +39,20 @@ class User(Base):
     orders: Mapped[list["Order"]] = relationship(back_populates="user")
 
 
+class Buyer(Base):
+    __tablename__ = "buyers"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
+
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    orders: Mapped[list["Order"]] = relationship(back_populates="buyer")
+
+
 class Product(Base):
     __tablename__ = "products"
 
@@ -55,6 +69,12 @@ class Product(Base):
     storage_provider: Mapped[str] = mapped_column(String(64), default="static_onedrive")
     file_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     onedrive_url: Mapped[str] = mapped_column(Text)
+    stripe_product_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    stripe_price_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    stripe_price_amount_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    stripe_price_currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    stripe_payment_link_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    stripe_payment_link_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -68,7 +88,8 @@ class Order(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    buyer_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("buyers.id"), nullable=True, index=True)
     product_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("products.id"), index=True)
 
     status: Mapped[str] = mapped_column(String(32), default="pending", index=True)
@@ -79,7 +100,8 @@ class Order(Base):
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     fulfilled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    user: Mapped[User] = relationship(back_populates="orders")
+    user: Mapped[User | None] = relationship(back_populates="orders")
+    buyer: Mapped[Buyer | None] = relationship(back_populates="orders")
     product: Mapped[Product] = relationship(back_populates="orders")
     payments: Mapped[list["Payment"]] = relationship(back_populates="order")
     access_grants: Mapped[list["AccessGrant"]] = relationship(back_populates="order")
@@ -94,7 +116,8 @@ class Payment(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id"), index=True)
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    buyer_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("buyers.id"), nullable=True, index=True)
 
     provider: Mapped[str] = mapped_column(String(32), index=True)
     provider_payment_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -117,11 +140,13 @@ class AccessGrant(Base):
     __tablename__ = "access_grants"
     __table_args__ = (
         UniqueConstraint("user_id", "product_id", "order_id", name="uq_grant_user_product_order"),
+        UniqueConstraint("buyer_id", "product_id", "order_id", name="uq_grant_buyer_product_order"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    buyer_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("buyers.id"), nullable=True, index=True)
     product_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("products.id"), index=True)
     order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id"), index=True)
 

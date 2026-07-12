@@ -8,6 +8,8 @@ admin.hh88trance.com
 
 The portal requires `ADMIN_PORTAL_TOKEN`, sets a signed HTTP-only session cookie, and should be kept behind the admin hostname and any edge access policy you enable.
 
+The production file browser is locked to `/mnt/storefront-media`. The API container mounts that host directory read-write, and the downloads container mounts the same directory read-only. Storage keys shown in the portal are relative to `/mnt/storefront-media`; paths outside that directory and symlinks are not browsable from the portal.
+
 For local development and tests, the static React content editor is still available while Vite runs in development mode at:
 
 ```text

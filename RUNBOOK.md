@@ -117,14 +117,14 @@ curl -fsS http://127.0.0.1:${WEB_HTTP_PORT:-8080}/ready
 
 ## Stripe Test
 
-1. Open a website purchase link such as `https://serve.hh88trance.com/buy/file-11` and confirm it redirects to the Telegram bot for the matching active product.
-2. Send a Telegram deep link for the same active product.
+1. Open a website purchase link such as `https://serve.hh88trance.com/buy/file-11` and confirm it redirects to Stripe Checkout for the matching active product.
+2. Optionally send a Telegram deep link for the same active product and confirm it also opens Stripe Checkout from the bot.
 3. Complete Stripe test checkout.
 4. Confirm the Stripe webhook returns 200.
 5. Confirm `orders.status=paid`, one `access_grants` row exists, and one delivery token was created.
 6. Redeem the delivery URL once and verify redirect.
 
-Website purchase buttons must not create orders directly. They should only hit the backend `/buy/<slug>` redirect, and the bot should remain responsible for creating the Stripe Checkout Session after a Telegram account is linked.
+Website purchase buttons must not create Stripe sessions in frontend code. They should only hit the backend `/buy/<slug>` route; the backend creates the local order/payment, starts Stripe Checkout, and waits for the verified webhook before granting access.
 
 The public video pages poll `/catalog` for active product cards. After changing catalog/backend code, rebuild and recreate both `web` and `api`; after style-only frontend changes, rebuild and recreate `web`.
 
@@ -162,14 +162,14 @@ For browser uploads, the `api` container must have write access to the `storefro
 Quick check:
 
 ```bash
-docker compose exec api sh -lc 'test -w /srv/storefront-media/products'
+docker compose exec api sh -lc 'test -w /mnt/storefront-media'
 ```
 
 Saving an active product with an upload or existing storage key makes the product visible in Telegram `/catalog`.
 
 ## Asset Replacement
 
-Copy the replacement file under `DOWNLOAD_STORAGE_ROOT`, then swap the active asset file and optional product details in one command:
+Copy the replacement file under `/mnt/storefront-media`, then swap the active asset file and optional product details in one command:
 
 ```text
 /asset_replace slug="file-11" storage_key="file-11/original.mp4" title="File 11" price_cents=8000 display_name="File 11.mp4" content_type="video/mp4"

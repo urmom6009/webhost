@@ -304,9 +304,9 @@ function VideoCard({ video }: { video: VideoFile }) {
           href={purchaseUrl}
           target="_blank"
           rel="noreferrer"
-          aria-label={`Buy ${video.title} through Telegram and Stripe`}
+          aria-label={`Buy ${video.title} with Stripe`}
         >
-          Buy via Telegram {video.price}
+          Buy with Stripe {video.price}
         </a>
       </div>
     </article>

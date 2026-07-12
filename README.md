@@ -71,7 +71,7 @@ The source PDFs include explicit and protected-class hate references. The public
 
 The website video pages poll the backend catalog at `/catalog` every 15 seconds and again when the tab regains focus. When the catalog is reachable, only active backend products are shown; if no active products exist, the pages show an empty state. If the catalog cannot be reached, the site falls back to the checked-in catalog arrays in `src/content/catalog.ts`.
 
-Website purchase buttons point to the backend storefront redirect at `https://serve.hh88trance.com/buy/<product-slug>`. The backend validates that the product is active, opens the matching Telegram bot deep link, and the bot then creates the Stripe Checkout Session. Verified Stripe webhooks remain the only fulfillment path for access grants and delivery tokens.
+Website purchase buttons point to the backend storefront redirect at `https://serve.hh88trance.com/buy/<product-slug>`. The backend validates that the product is active, creates a local pending order, opens a Stripe Checkout Session, and stores Stripe buyer/customer data from the verified webhook. Verified Stripe webhooks remain the only fulfillment path for access grants and delivery tokens.
 
 Do not put `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, database URLs, bot tokens, or delivery secrets in frontend code. The website only needs the public storefront base URL at build time if the backend hostname differs from the browser origin:
 

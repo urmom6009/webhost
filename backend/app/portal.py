@@ -3,6 +3,7 @@ import hmac
 import os
 import re
 import secrets
+import stat
 import time
 import uuid
 from datetime import datetime
@@ -24,6 +25,7 @@ from app.db import SessionLocal
 from app.models import AuditEvent, File as ProductFile, Order, Product, utcnow
 from app.security import valid_deeplink_payload
 from app.services.delivery import local_file_path, safe_storage_key
+from app.services.stripe_service import sync_product_to_stripe
 
 router = APIRouter()
 
@@ -136,6 +138,10 @@ def storage_root() -> Path:
     return Path(settings().download_storage_root).resolve()
 
 
+def storage_root_label() -> str:
+    return str(storage_root())
+
+
 def resolve_storage_prefix(prefix: str | None) -> tuple[str, Path]:
     root = storage_root()
     if not prefix or not prefix.strip():
@@ -156,6 +162,29 @@ def format_bytes(size: int | None) -> str:
             return f"{value:.0f} {unit}" if unit == "B" else f"{value:.1f} {unit}"
         value /= 1024
     return f"{size} B"
+
+
+def format_mtime(timestamp: float) -> str:
+    return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M")
+
+
+def breadcrumb_links(prefix: str) -> str:
+    crumbs = [f'<a href="/admin/files">{escape(storage_root_label())}</a>']
+    current_parts: list[str] = []
+    for part in prefix.split("/"):
+        if not part:
+            continue
+        current_parts.append(part)
+        joined = "/".join(current_parts)
+        crumbs.append(f'<a href="/admin/files?prefix={quote(joined)}">{escape(part)}</a>')
+    return '<div class="crumbs">' + '<span>/</span>'.join(crumbs) + "</div>"
+
+
+def path_is_dir_no_follow(path: Path) -> bool:
+    try:
+        return stat.S_ISDIR(path.stat(follow_symlinks=False).st_mode)
+    except OSError:
+        return False
 
 
 async def write_upload(upload: UploadFile, slug: str) -> str:
@@ -286,10 +315,18 @@ def page_shell(title: str, body: str, *, authenticated: bool, notice: str | None
     .error {{ background: #fef3f2; border: 1px solid #fecdca; color: var(--danger); }}
     .tile-preview {{ display: grid; grid-template-columns: 72px 1fr; gap: 13px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: #fbfdff; }}
     .thumb {{ display: grid; place-items: center; width: 72px; height: 72px; border-radius: 8px; background: #111827; color: white; font-weight: 800; text-align: center; font-size: 12px; }}
+    .file-toolbar {{ display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin: 12px 0 16px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #fbfdff; }}
+    .crumbs {{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 800; overflow-wrap: anywhere; }}
+    .crumbs span {{ color: var(--muted); font-weight: 700; }}
+    .crumbs a {{ color: var(--accent-dark); }}
     .file-list {{ display: grid; gap: 8px; }}
-    .file-row {{ display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--surface); }}
+    .file-row {{ display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--surface); }}
+    .file-row.folder {{ background: #fbfdff; }}
+    .file-icon {{ display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; background: var(--soft-blue); color: var(--accent-dark); font-size: 14px; font-weight: 900; }}
+    .file-row.blocked .file-icon {{ background: #fef3f2; color: var(--danger); }}
     .file-main {{ min-width: 0; }}
     .file-name {{ font-weight: 800; overflow-wrap: anywhere; }}
+    .file-meta {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; color: var(--muted); font-size: 12px; }}
     code {{ background: #f2f4f7; border: 1px solid var(--line); border-radius: 6px; padding: 2px 5px; }}
     .login {{ max-width: 440px; margin: 10vh auto; }}
     @media (max-width: 980px) {{
@@ -365,7 +402,8 @@ def product_table(products: list[Product], active_files: dict[str, ProductFile],
         file_label = "Ready" if file else "No active file"
         file_class = "file-ready" if file else "muted"
         created = product.created_at.strftime("%Y-%m-%d") if isinstance(product.created_at, datetime) else ""
-        bot_link = f"https://t.me/{quote(settings().telegram_bot_username)}?start={quote(product.slug)}"
+        buy_link = f"{settings().public_base_url.rstrip('/')}/buy/{quote(product.slug)}"
+        stripe_link = product.stripe_payment_link_url or ""
         toggle_label = "Disable" if product.active else "Enable"
         rows.append(
             f"""
@@ -378,7 +416,8 @@ def product_table(products: list[Product], active_files: dict[str, ProductFile],
               <td>{escape(created)}</td>
               <td>
                 <div class="actions">
-                  <a class="button" href="{bot_link}" target="_blank" rel="noreferrer">Bot link</a>
+                  <a class="button" href="{escape(buy_link)}" target="_blank" rel="noreferrer">Buy link</a>
+                  {f'<a class="button" href="{escape(stripe_link)}" target="_blank" rel="noreferrer">Stripe link</a>' if stripe_link else ''}
                   <form action="/admin/content/{product.id}/toggle" method="post"><button type="submit">{toggle_label}</button></form>
                 </div>
               </td>
@@ -421,7 +460,7 @@ def product_form() -> str:
           </label>
           <label>Or attach existing server file
             <input name="storage_key" placeholder="my-product/original.mp4">
-            <span class="help">Use this when the file already exists under DOWNLOAD_STORAGE_ROOT.</span>
+            <span class="help">Use this when the file already exists under /mnt/storefront-media.</span>
           </label>
           <label>Download filename
             <input name="display_name" placeholder="Video Editing LUT Pack.zip">
@@ -436,6 +475,7 @@ def product_form() -> str:
             <textarea name="preview_caption" placeholder="Caption text for Telegram preview posts."></textarea>
           </label>
           <label class="check-row"><input type="checkbox" name="active" value="yes" checked> Active in catalog</label>
+          <p class="help">Saving creates or updates the matching Stripe Product, Price, and Payment Link. Price changes create a new Stripe Price.</p>
           <div class="tile-preview">
             <div class="thumb">NEW<br>TILE</div>
             <div>
@@ -455,7 +495,7 @@ def file_browser(prefix: str, current_path: Path) -> str:
         return f"""
           <section class="panel panel-pad">
             <h2>Server Files</h2>
-            <p>The storage root does not exist yet: <code>{escape(str(root))}</code></p>
+            <p>The storage root does not exist yet: <code>{escape(storage_root_label())}</code></p>
           </section>
         """
     if not current_path.exists():
@@ -480,40 +520,71 @@ def file_browser(prefix: str, current_path: Path) -> str:
         parent = "/".join(prefix.split("/")[:-1])
         rows.append(
             f"""
-            <div class="file-row">
+            <div class="file-row folder">
+              <div class="file-icon">..</div>
               <div class="file-main">
                 <a class="file-name" href="/admin/files?prefix={quote(parent)}">../</a>
-                <div class="slug">Parent folder</div>
+                <div class="file-meta"><span>Parent folder</span></div>
               </div>
             </div>
             """
         )
 
-    children = sorted(current_path.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower()))
+    children = sorted(current_path.iterdir(), key=lambda item: (not path_is_dir_no_follow(item), item.name.lower()))
     visible_children = children[:500]
     for child in visible_children:
         child_prefix = f"{prefix}/{child.name}" if prefix else child.name
-        if child.is_dir():
+        try:
+            child_stat = child.stat(follow_symlinks=False)
+        except OSError as exc:
             rows.append(
                 f"""
-                <div class="file-row">
+                <div class="file-row blocked">
+                  <div class="file-icon">!</div>
                   <div class="file-main">
-                    <a class="file-name" href="/admin/files?prefix={quote(child_prefix)}">{escape(child.name)}/</a>
-                    <div class="slug">Folder</div>
+                    <div class="file-name">{escape(child.name)}</div>
+                    <div class="file-meta"><span>Cannot read metadata</span><span>{escape(str(exc))}</span></div>
                   </div>
                 </div>
                 """
             )
             continue
-        stat = child.stat()
+        if stat.S_ISLNK(child_stat.st_mode):
+            rows.append(
+                f"""
+                <div class="file-row blocked">
+                  <div class="file-icon">!</div>
+                  <div class="file-main">
+                    <div class="file-name">{escape(child.name)}</div>
+                    <div class="file-meta"><span>Symlink blocked</span><span>Not browsable from the admin portal</span></div>
+                  </div>
+                </div>
+                """
+            )
+            continue
+        if stat.S_ISDIR(child_stat.st_mode):
+            rows.append(
+                f"""
+                <div class="file-row folder">
+                  <div class="file-icon">/</div>
+                  <div class="file-main">
+                    <a class="file-name" href="/admin/files?prefix={quote(child_prefix)}">{escape(child.name)}/</a>
+                    <div class="file-meta"><span>Folder</span><span>Modified {escape(format_mtime(child_stat.st_mtime))}</span></div>
+                  </div>
+                </div>
+                """
+            )
+            continue
         rows.append(
             f"""
             <div class="file-row">
+              <div class="file-icon">F</div>
               <div class="file-main">
                 <div class="file-name">{escape(child.name)}</div>
                 <div class="slug">Storage key: <code>{escape(child_prefix)}</code></div>
+                <div class="file-meta"><span>Modified {escape(format_mtime(child_stat.st_mtime))}</span></div>
               </div>
-              <div class="muted">{escape(format_bytes(stat.st_size))}</div>
+              <div class="muted">{escape(format_bytes(child_stat.st_size))}</div>
             </div>
             """
         )
@@ -525,8 +596,14 @@ def file_browser(prefix: str, current_path: Path) -> str:
     return f"""
       <section class="panel panel-pad">
         <h2>Server Files</h2>
-        <p>Browsing <code>{escape(str(root))}</code>. Use a file's storage key in the content form to attach existing server content.</p>
-        <p class="muted">Current folder: <code>{escape(prefix or "/")}</code></p>
+        <p>Browsing is locked to <code>{escape(storage_root_label())}</code>. Use a file's storage key in the content form to attach existing server content.</p>
+        <div class="file-toolbar">
+          <div>
+            <div class="help">Current folder</div>
+            {breadcrumb_links(prefix)}
+          </div>
+          <div class="help">Storage keys are always relative to this mounted root.</div>
+        </div>
         <div class="file-list">
           {''.join(rows) if rows else '<p class="muted">This folder is empty.</p>'}
         </div>
@@ -631,6 +708,9 @@ async def save_product_from_form(
             target_id=str(product.id),
             metadata={"slug": product.slug, "storage_key": None},
         )
+
+    sync_product_to_stripe(product)
+    product.updated_at = utcnow()
 
     return product
 
@@ -780,6 +860,7 @@ async def admin_content_toggle(request: Request, product_id: str) -> Response:
             return await admin_content(request, notice="Product not found.")
         product.active = not product.active
         product.updated_at = utcnow()
+        sync_product_to_stripe(product)
         await create_audit(
             session,
             "portal_product_toggled",

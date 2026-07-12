@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 import app.main as main
-from app.models import AccessGrant, DeliveryToken, Order, Payment, Product, User
+from app.models import AccessGrant, Buyer, DeliveryToken, Order, Payment, Product, User
 from app.services.stripe_service import create_checkout_session
 
 
@@ -30,6 +30,17 @@ class FakeSessionContext:
 
     async def execute(self, statement):
         return FakeScalarResult(self.product)
+
+
+class ExistingSessionContext:
+    def __init__(self, session):
+        self.session = session
+
+    async def __aenter__(self):
+        return self.session
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
 
 
 async def create_pending_stripe_order(session):
@@ -81,7 +92,7 @@ def test_checkout_session_metadata_includes_order_id(monkeypatch):
     product.id = uuid.uuid4()
     order = Order(id=uuid.uuid4(), user_id=user.id, product_id=product.id, amount_cents=999, currency="usd")
 
-    create_checkout_session(order, user, product)
+    create_checkout_session(order, product, user=user)
 
     assert captured["client_reference_id"] == str(order.id)
     assert captured["metadata"]["order_id"] == str(order.id)
@@ -166,9 +177,121 @@ async def test_wrong_amount_does_not_grant_access(session):
 
 
 @pytest.mark.asyncio
+async def test_paid_web_checkout_fulfills_without_telegram_message(session):
+    buyer = Buyer(email=None)
+    product = Product(
+        slug="file-11",
+        title="File 11",
+        description="test",
+        price_cents=80000,
+        currency="usd",
+        onedrive_url="https://onedrive.test/file",
+        active=True,
+    )
+    session.add_all([buyer, product])
+    await session.flush()
+    order = Order(
+        buyer_id=buyer.id,
+        product_id=product.id,
+        status="pending",
+        amount_cents=80000,
+        currency="usd",
+    )
+    session.add(order)
+    await session.flush()
+    payment = Payment(
+        order_id=order.id,
+        buyer_id=buyer.id,
+        provider="stripe",
+        provider_session_id="cs_web_123",
+        status="pending",
+        amount_minor=80000,
+        currency="usd",
+    )
+    session.add(payment)
+    await session.flush()
+
+    checkout = {
+        "id": "cs_web_123",
+        "client_reference_id": str(order.id),
+        "metadata": {"order_id": str(order.id), "product_slug": product.slug},
+        "payment_status": "paid",
+        "payment_intent": "pi_web_123",
+        "amount_total": 80000,
+        "currency": "usd",
+        "customer": "cus_web_123",
+        "customer_details": {"email": "buyer@example.com", "name": "Buyer Name"},
+    }
+
+    assert await main.handle_checkout_session_completed(session, checkout) is None
+    grants = (await session.execute(select(AccessGrant))).scalars().all()
+    tokens = (await session.execute(select(DeliveryToken))).scalars().all()
+    assert len(grants) == 1
+    assert grants[0].buyer_id == buyer.id
+    assert grants[0].user_id is None
+    assert len(tokens) == 1
+    assert buyer.email == "buyer@example.com"
+    assert buyer.name == "Buyer Name"
+    assert buyer.stripe_customer_id == "cus_web_123"
+
+
 @pytest.mark.asyncio
-async def test_product_purchase_redirect_rejects_disabled_product(monkeypatch):
-    monkeypatch.setattr(main, "SessionLocal", lambda: FakeSessionContext(None))
+async def test_paid_payment_link_checkout_creates_local_order(session):
+    product = Product(
+        slug="file-11",
+        title="File 11",
+        description="test",
+        price_cents=80000,
+        currency="usd",
+        onedrive_url="https://onedrive.test/file",
+        stripe_payment_link_id="plink_123",
+        active=True,
+    )
+    session.add(product)
+    await session.commit()
+
+    checkout = {
+        "id": "cs_link_123",
+        "metadata": {"product_slug": product.slug},
+        "payment_link": "plink_123",
+        "payment_status": "paid",
+        "payment_intent": "pi_link_123",
+        "amount_total": 80000,
+        "currency": "usd",
+        "customer": "cus_link_123",
+        "customer_details": {"email": "link-buyer@example.com"},
+    }
+
+    assert await main.handle_checkout_session_completed(session, checkout) is None
+    buyers = (await session.execute(select(Buyer))).scalars().all()
+    orders = (await session.execute(select(Order))).scalars().all()
+    payments = (await session.execute(select(Payment))).scalars().all()
+    grants = (await session.execute(select(AccessGrant))).scalars().all()
+
+    assert len(buyers) == 1
+    assert buyers[0].email == "link-buyer@example.com"
+    assert len(orders) == 1
+    assert orders[0].buyer_id == buyers[0].id
+    assert len(payments) == 1
+    assert payments[0].provider_session_id == "cs_link_123"
+    assert len(grants) == 1
+    assert grants[0].buyer_id == buyers[0].id
+
+
+@pytest.mark.asyncio
+async def test_product_purchase_redirect_rejects_disabled_product(session, monkeypatch):
+    product = Product(
+        slug="file-11",
+        title="File 11",
+        description="test",
+        price_cents=80000,
+        currency="usd",
+        onedrive_url="https://onedrive.test/file",
+        active=False,
+    )
+    session.add(product)
+    await session.commit()
+    monkeypatch.setattr(main, "SessionLocal", lambda: ExistingSessionContext(session))
 
     with pytest.raises(HTTPException) as exc_info:
         await main.product_purchase_redirect("file-11")
@@ -184,13 +307,13 @@ async def test_product_purchase_redirects_invalid_deeplink_payload(monkeypatch):
     monkeypatch.setattr(main, "SessionLocal", failing_session)
     monkeypatch.setattr(main, "valid_deeplink_payload", lambda payload: False)
 
-    with pytest.raises(HTTPException as exc_info):
+    with pytest.raises(HTTPException) as exc_info:
         await main.product_purchase_redirect("invalid-slug")
 
     assert exc_info.value.status_code == 404
 
 @pytest.mark.asyncio
-async def test_product_purchase_redirect_returns_503_on_bad_bot_username(monkeypatch):
+async def test_product_purchase_redirect_creates_direct_checkout(session, monkeypatch):
     product = Product(
         slug="file-11",
         title="File 11",
@@ -200,14 +323,48 @@ async def test_product_purchase_redirect_returns_503_on_bad_bot_username(monkeyp
         onedrive_url="https://onedrive.test/file",
         active=True,
     )
+    session.add(product)
+    await session.commit()
 
-    # valid deeplink payload and active product so we reach the telegram state
-    def failing_telegram_bot_deeplink(*args, **kwargs):
-        raise ValueError("bad bot name")
+    checkout = type("Checkout", (), {"id": "cs_web_123", "url": "https://checkout.test/web"})()
 
-    monkeypatch.setattr(main, "telegram_bot_deeplink", failing_telegram_bot_deeplink)
+    monkeypatch.setattr(main, "SessionLocal", lambda: ExistingSessionContext(session))
+    monkeypatch.setattr(main, "create_checkout_session", lambda **kwargs: checkout)
+
+    response = await main.product_purchase_redirect("file-11")
+    orders = (await session.execute(select(Order))).scalars().all()
+    payments = (await session.execute(select(Payment))).scalars().all()
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "https://checkout.test/web"
+    assert len(orders) == 1
+    assert orders[0].buyer_id is not None
+    assert orders[0].user_id is None
+    assert len(payments) == 1
+    assert payments[0].provider_session_id == "cs_web_123"
+
+
+@pytest.mark.asyncio
+async def test_product_purchase_redirect_returns_502_when_stripe_checkout_fails(session, monkeypatch):
+    product = Product(
+        slug="file-11",
+        title="File 11",
+        description="test",
+        price_cents=80000,
+        currency="usd",
+        onedrive_url="https://onedrive.test/file",
+        active=True,
+    )
+    session.add(product)
+    await session.commit()
+
+    def failing_checkout(**kwargs):
+        raise RuntimeError("stripe unavailable")
+
+    monkeypatch.setattr(main, "SessionLocal", lambda: ExistingSessionContext(session))
+    monkeypatch.setattr(main, "create_checkout_session", failing_checkout)
 
     with pytest.raises(HTTPException) as exc_info:
         await main.product_purchase_redirect("file-11")
 
-    assert exc_info.value.status_code == 503
+    assert exc_info.value.status_code == 502
