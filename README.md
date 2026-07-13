@@ -1,6 +1,4 @@
-# HH88TRANCE
-
-Docker Compose-ready React site plus the Telegram storefront backend for the HH88TRANCE adult audio/video brand.
+Docker Compose-ready React site plus the Telegram storefront backend for a video brand.
 
 The public site now uses a refined dark catalog system: hard-edged frames, steel grid rails, red status accents, condensed uppercase headings, and live video availability pulled from the backend product catalog. Public copy remains sanitized for hosting and payment-provider risk.
 
